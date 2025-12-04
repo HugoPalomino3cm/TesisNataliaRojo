@@ -1,0 +1,70 @@
+# .gitignore para proyecto de análisis de microplásticos
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Datos e imágenes (comentar si quieres versionar tus imágenes)
+data/raw_images/*.jpg
+data/raw_images/*.jpeg
+data/raw_images/*.png
+data/raw_images/*.tif
+data/raw_images/*.tiff
+data/raw_images/*.bmp
+
+# Imágenes procesadas
+data/processed_images/*
+
+# Resultados
+results/graphs/*
+results/reports/*
+
+# Mantener estructura de carpetas
+!data/raw_images/.gitkeep
+!data/processed_images/.gitkeep
+!results/graphs/.gitkeep
+!results/reports/.gitkeep
+!data/raw_images/INSTRUCCIONES.md
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
