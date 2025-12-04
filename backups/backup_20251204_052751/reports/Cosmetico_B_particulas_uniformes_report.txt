@@ -1,0 +1,28 @@
+============================================================
+REPORTE DE ANÁLISIS DE MICROPLÁSTICOS
+Muestra: Cosmetico_B_particulas_uniformes
+============================================================
+
+Número total de partículas detectadas: 426
+
+DISTRIBUCIÓN DE TAMAÑOS:
+----------------------------------------
+  Pequeño: 420 partículas (98.6%)
+  Mediano: 5 partículas (1.2%)
+  Grande: 1 partículas (0.2%)
+
+ESTADÍSTICOS DE ÁREA (μm²):
+----------------------------------------
+  Media: 267.02
+  Mediana: 29.00
+  Desviación estándar: 2426.33
+  Mínimo: 13.00
+  Máximo: 46049.00
+
+DISTRIBUCIÓN DE FORMAS:
+----------------------------------------
+  Alargado: 252 partículas (59.2%)
+  Esférico: 158 partículas (37.1%)
+  Fibra: 16 partículas (3.8%)
+
+============================================================

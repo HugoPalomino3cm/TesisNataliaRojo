@@ -1,0 +1,27 @@
+============================================================
+REPORTE DE ANÁLISIS DE MICROPLÁSTICOS
+Muestra: Textil_A_fibras_largas
+============================================================
+
+Número total de partículas detectadas: 439
+
+DISTRIBUCIÓN DE TAMAÑOS:
+----------------------------------------
+  Pequeño: 437 partículas (99.5%)
+  Mediano: 2 partículas (0.5%)
+
+ESTADÍSTICOS DE ÁREA (μm²):
+----------------------------------------
+  Media: 148.79
+  Mediana: 36.00
+  Desviación estándar: 846.47
+  Mínimo: 12.00
+  Máximo: 14899.00
+
+DISTRIBUCIÓN DE FORMAS:
+----------------------------------------
+  Alargado: 264 partículas (60.1%)
+  Esférico: 154 partículas (35.1%)
+  Fibra: 21 partículas (4.8%)
+
+============================================================

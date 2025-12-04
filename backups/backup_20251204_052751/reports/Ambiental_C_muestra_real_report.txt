@@ -1,0 +1,28 @@
+============================================================
+REPORTE DE ANÁLISIS DE MICROPLÁSTICOS
+Muestra: Ambiental_C_muestra_real
+============================================================
+
+Número total de partículas detectadas: 416
+
+DISTRIBUCIÓN DE TAMAÑOS:
+----------------------------------------
+  Pequeño: 410 partículas (98.6%)
+  Mediano: 4 partículas (1.0%)
+  Grande: 2 partículas (0.5%)
+
+ESTADÍSTICOS DE ÁREA (μm²):
+----------------------------------------
+  Media: 324.50
+  Mediana: 30.00
+  Desviación estándar: 3216.05
+  Mínimo: 13.00
+  Máximo: 46905.00
+
+DISTRIBUCIÓN DE FORMAS:
+----------------------------------------
+  Alargado: 242 partículas (58.2%)
+  Esférico: 160 partículas (38.5%)
+  Fibra: 14 partículas (3.4%)
+
+============================================================

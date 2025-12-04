@@ -123,27 +123,27 @@ class MicroplasticAnalysisGUI:
         watermark_label.pack(anchor=tk.W)
         
         # Frame principal con pestañas
-        notebook = ttk.Notebook(self.root)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 15))
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=(10, 15))
         
         # Pestaña 1: Configuración
-        config_frame = ttk.Frame(notebook)
-        notebook.add(config_frame, text="⚙️ Configuración")
+        config_frame = ttk.Frame(self.notebook)
+        self.notebook.add(config_frame, text="⚙️ Configuración")
         self.create_config_tab(config_frame)
         
         # Pestaña 2: Análisis
-        analysis_frame = ttk.Frame(notebook)
-        notebook.add(analysis_frame, text="🔬 Análisis")
+        analysis_frame = ttk.Frame(self.notebook)
+        self.notebook.add(analysis_frame, text="🔬 Análisis")
         self.create_analysis_tab(analysis_frame)
         
         # Pestaña 3: Visualización de Gráficos
-        viewer_frame = ttk.Frame(notebook)
-        notebook.add(viewer_frame, text="📊 Ver Gráficos")
+        viewer_frame = ttk.Frame(self.notebook)
+        self.notebook.add(viewer_frame, text="📊 Ver Gráficos")
         self.create_viewer_tab(viewer_frame)
         
         # Pestaña 4: Gestión
-        management_frame = ttk.Frame(notebook)
-        notebook.add(management_frame, text="📁 Gestión de Resultados")
+        management_frame = ttk.Frame(self.notebook)
+        self.notebook.add(management_frame, text="📁 Gestión de Resultados")
         self.create_management_tab(management_frame)
     
     def create_config_tab(self, parent):
@@ -677,84 +677,79 @@ class MicroplasticAnalysisGUI:
     def browse_images(self):
         """Abre diálogo para seleccionar imágenes."""
         files = filedialog.askopenfilenames(
-            title="Seleccionar imágenes microscópicas",
+            title="Seleccionar imagenes microscopicas",
             filetypes=[
-                ("Imágenes", "*.jpg *.jpeg *.png *.tif *.tiff *.bmp"),
+                ("Imagenes", "*.jpg *.jpeg *.png *.tif *.tiff *.bmp"),
                 ("Todos los archivos", "*.*")
             ]
         )
         
         if files:
-            self.image_files = list(files)
+            # Validar que los archivos existen
+            valid_files = [f for f in files if Path(f).exists() and Path(f).is_file()]
+            self.image_files = valid_files
             self.update_image_list()
+            
+            if valid_files:
+                self.log_console(f"[OK] Seleccionadas {len(valid_files)} imagenes\n")
+            else:
+                self.log_console(f"[!] No se encontraron archivos validos\n")
     
     def load_default_images(self):
         """Carga imágenes de la carpeta por defecto."""
         image_extensions = ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']
-        self.image_files = []
+        temp_files = []
         
         for ext in image_extensions:
-            self.image_files.extend(RAW_IMAGES_DIR.glob(f'*{ext}'))
-            self.image_files.extend(RAW_IMAGES_DIR.glob(f'*{ext.upper()}'))
+            temp_files.extend(RAW_IMAGES_DIR.glob(f'*{ext}'))
+            temp_files.extend(RAW_IMAGES_DIR.glob(f'*{ext.upper()}'))
         
-        self.image_files = [str(f) for f in self.image_files]
+        # Filtrar archivos válidos y eliminar duplicados
+        unique_files = list(set([str(f) for f in temp_files if f.exists() and f.is_file()]))
+        unique_files.sort()
+        self.image_files = unique_files
         self.update_image_list()
         
         if self.image_files:
-            self.log_console(f"✓ Cargadas {len(self.image_files)} imágenes de {RAW_IMAGES_DIR}\n")
+            self.log_console(f"[OK] Cargadas {len(self.image_files)} imagenes de {RAW_IMAGES_DIR}\n")
         else:
-            self.log_console(f"⚠️ No se encontraron imágenes en {RAW_IMAGES_DIR}\n")
+            self.log_console(f"[!] No se encontraron imagenes en {RAW_IMAGES_DIR}\n")
     
     def update_image_list(self):
-        """Actualiza la lista de imágenes en la interfaz."""
+        """Actualiza la lista de imagenes en la interfaz."""
         self.image_listbox.delete(0, tk.END)
         for img in self.image_files:
             filename = Path(img).name
-            self.image_listbox.insert(tk.END, f"  📷 {filename}")
+            self.image_listbox.insert(tk.END, f"  [IMG] {filename}")
     
     def remove_selected_images(self):
         """Elimina las imágenes seleccionadas de la lista."""
         selected_indices = self.image_listbox.curselection()
         
         if not selected_indices:
-            messagebox.showwarning(
-                "Sin Selección",
-                "Por favor, selecciona una o más imágenes para eliminar.\n\n"
-                "Tip: Usa Ctrl+Click para seleccionar múltiples imágenes."
-            )
+            self.log_console("[!] Selecciona una o mas imagenes para eliminar (Ctrl+Click para multiple).\n")
             return
         
-        # Confirmar eliminación
+        # Eliminar sin confirmación
         count = len(selected_indices)
-        if not messagebox.askyesno(
-            "Confirmar Eliminación",
-            f"¿Deseas eliminar {count} imagen(es) de la lista?\n\n"
-            "Nota: Solo se eliminan de la lista, no del disco."
-        ):
-            return
         
         # Eliminar en orden inverso para no alterar índices
         for index in reversed(selected_indices):
             del self.image_files[index]
         
         self.update_image_list()
-        self.log_console(f"✓ {count} imagen(es) eliminada(s) de la lista\n")
+        self.log_console(f"[OK] {count} imagen(es) eliminada(s) de la lista\n")
     
     def clear_all_images(self):
-        """Limpia todas las imágenes de la lista."""
+        """Limpia todas las imagenes de la lista."""
         if not self.image_files:
-            messagebox.showinfo("Lista Vacía", "No hay imágenes en la lista.")
+            self.log_console("[!] No hay imagenes en la lista.\n")
             return
         
         count = len(self.image_files)
-        if messagebox.askyesno(
-            "Limpiar Todas",
-            f"¿Deseas eliminar todas las {count} imágenes de la lista?\n\n"
-            "Nota: Solo se eliminan de la lista, no del disco."
-        ):
-            self.image_files = []
-            self.update_image_list()
-            self.log_console(f"✓ Todas las imágenes eliminadas de la lista\n")
+        self.image_files = []
+        self.update_image_list()
+        self.log_console(f"[OK] {count} imagenes eliminadas de la lista\n")
     
     def log_console(self, message):
         """Agrega mensaje a la consola."""
@@ -780,24 +775,11 @@ class MicroplasticAnalysisGUI:
     def start_analysis(self):
         """Inicia el análisis en un hilo separado."""
         if not self.image_files:
-            messagebox.showwarning(
-                "Sin Imágenes",
-                "Por favor, selecciona o carga imágenes antes de iniciar el análisis."
-            )
+            self.log_console("[!] No hay imagenes cargadas. Usa el boton 'Usar Carpeta por Defecto' primero.\n")
             return
         
         if self.analysis_running:
-            messagebox.showinfo("Análisis en Curso", "Ya hay un análisis en ejecución.")
-            return
-        
-        # Confirmar calibración
-        response = messagebox.askyesno(
-            "Confirmar Calibración",
-            f"Factor de calibración: {self.pixels_to_um.get()} μm/píxel\n\n"
-            "¿Es correcto este valor?"
-        )
-        
-        if not response:
+            self.log_console("[!] Ya hay un analisis en ejecucion.\n")
             return
         
         self.analysis_running = True
@@ -820,7 +802,7 @@ class MicroplasticAnalysisGUI:
             from src.visualization import DataVisualizer
             
             self.message_queue.put("="*60 + "\n")
-            self.message_queue.put("🔬 INICIANDO ANÁLISIS DE MICROPLÁSTICOS\n")
+            self.message_queue.put("[INICIO] ANALISIS DE MICROPLASTICOS\n")
             self.message_queue.put("="*60 + "\n\n")
             
             # Crear sistema inline
@@ -976,23 +958,21 @@ class MicroplasticAnalysisGUI:
             system.generate_consolidated_report()
             
             self.message_queue.put("\n" + "="*60 + "\n")
-            self.message_queue.put("✓ ANÁLISIS COMPLETADO EXITOSAMENTE\n")
+            self.message_queue.put("[COMPLETADO] ANALISIS FINALIZADO\n")
             self.message_queue.put("="*60 + "\n")
+            self.message_queue.put(f"\n[INFO] Resultados guardados en:\n")
+            self.message_queue.put(f"  - Graficos: {GRAPHS_DIR}\n")
+            self.message_queue.put(f"  - Reportes: {REPORTS_DIR}\n\n")
             
-            self.root.after(0, lambda: messagebox.showinfo(
-                "Análisis Completado",
-                "El análisis ha finalizado exitosamente.\n\n"
-                f"Resultados guardados en:\n"
-                f"• Gráficos: {GRAPHS_DIR}\n"
-                f"• Reportes: {REPORTS_DIR}"
-            ))
+            # Cambiar a pestaña de gráficos automáticamente
+            self.root.after(0, lambda: self.notebook.select(1))
             
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            self.message_queue.put(f"\n❌ ERROR: {str(e)}\n")
+            self.message_queue.put(f"\n[ERROR] {str(e)}\n")
             self.message_queue.put(f"{error_details}\n")
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Error durante el análisis:\n{str(e)}"))
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Error durante el analisis:\n{str(e)}"))
         
         finally:
             self.analysis_running = False
@@ -1007,9 +987,8 @@ class MicroplasticAnalysisGUI:
     
     def stop_analysis(self):
         """Detiene el análisis."""
-        if messagebox.askyesno("Detener Análisis", "¿Seguro que deseas detener el análisis?"):
-            self.analysis_running = False
-            self.log_console("\n⚠️ Análisis detenido por el usuario.\n")
+        self.analysis_running = False
+        self.log_console("\n[!] Analisis detenido por el usuario.\n")
     
     def update_results_info(self):
         """Actualiza la información de resultados."""
@@ -1159,6 +1138,13 @@ class MicroplasticAnalysisGUI:
                     f"Tamaño: {backup_size:.2f} MB\n\n"
                     f"Carpeta completa:\n{backup_folder}"
                 )
+                
+                # Abrir carpeta de respaldo
+                import subprocess
+                try:
+                    subprocess.Popen(f'explorer "{backup_folder}"')
+                except:
+                    pass
                 
                 self.update_results_info()
                 

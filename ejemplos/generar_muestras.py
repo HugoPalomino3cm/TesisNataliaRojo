@@ -1,8 +1,8 @@
 """
-Script para generar imágenes sintéticas de microplásticos para pruebas.
+Script para generar imágenes adicionales de microplásticos para pruebas.
 
-Este script crea imágenes simuladas de microplásticos con diferentes
-características morfológicas para probar el sistema de análisis.
+Este script crea 3 imágenes sintéticas adicionales con diferentes
+características morfológicas.
 """
 
 import numpy as np
@@ -30,17 +30,17 @@ def generate_synthetic_microplastics(output_path: str,
     """
     if particle_types is None:
         particle_types = {
-            'small_round': 0.3,      # Partículas pequeñas redondeadas
-            'medium_round': 0.3,     # Partículas medianas redondeadas
-            'large_round': 0.2,      # Partículas grandes redondeadas
-            'fiber': 0.2             # Fibras alargadas
+            'small_round': 0.3,
+            'medium_round': 0.3,
+            'large_round': 0.2,
+            'fiber': 0.2
         }
     
     # Crear imagen de fondo (gris claro)
     image = np.ones((*image_size, 3), dtype=np.uint8) * 220
     
     particles_created = 0
-    max_attempts = num_particles * 3  # Límite de intentos para evitar bucles infinitos
+    max_attempts = num_particles * 3
     attempts = 0
     
     while particles_created < num_particles and attempts < max_attempts:
@@ -58,7 +58,6 @@ def generate_synthetic_microplastics(output_path: str,
         
         # Generar partícula según tipo
         if particle_type == 'small_round':
-            # Partículas pequeñas (5-15 píxeles de radio)
             radius = np.random.randint(5, 15)
             color = np.random.randint(40, 100)
             cv2.circle(image, (center_x, center_y), radius, 
@@ -66,7 +65,6 @@ def generate_synthetic_microplastics(output_path: str,
             particles_created += 1
             
         elif particle_type == 'medium_round':
-            # Partículas medianas (15-30 píxeles de radio)
             radius = np.random.randint(15, 30)
             color = np.random.randint(40, 100)
             cv2.circle(image, (center_x, center_y), radius,
@@ -74,7 +72,6 @@ def generate_synthetic_microplastics(output_path: str,
             particles_created += 1
             
         elif particle_type == 'large_round':
-            # Partículas grandes (30-50 píxeles de radio)
             radius = np.random.randint(30, 50)
             color = np.random.randint(40, 100)
             cv2.circle(image, (center_x, center_y), radius,
@@ -82,12 +79,10 @@ def generate_synthetic_microplastics(output_path: str,
             particles_created += 1
             
         elif particle_type == 'fiber':
-            # Fibras alargadas
             length = np.random.randint(40, 120)
             width = np.random.randint(3, 8)
             angle = np.random.uniform(0, 180)
             
-            # Calcular puntos de inicio y fin de la fibra
             angle_rad = np.radians(angle)
             end_x = int(center_x + length * np.cos(angle_rad))
             end_y = int(center_y + length * np.sin(angle_rad))
@@ -113,58 +108,58 @@ def main():
     """Función principal para generar conjunto de imágenes de prueba."""
     
     print("\n" + "="*60)
-    print("GENERADOR DE IMÁGENES SINTÉTICAS DE MICROPLÁSTICOS")
+    print("GENERADOR DE MUESTRAS ADICIONALES DE MICROPLASTICOS")
     print("="*60)
     
     # Crear directorio si no existe
     raw_images_dir = DATA_DIR / "raw_images"
     raw_images_dir.mkdir(parents=True, exist_ok=True)
     
-    print(f"\nGenerando imágenes en: {raw_images_dir}")
+    print(f"\nGenerando imagenes en: {raw_images_dir}")
     print("-" * 60)
     
-    # Generar 3 imágenes de muestra con diferentes características
+    # Generar 3 imágenes adicionales con características diferentes
     
-    # Muestra 1: Pocas partículas, mayormente pequeñas
+    # Muestra 1: Solo fibras largas (simulación de contaminación textil)
     generate_synthetic_microplastics(
-        output_path=raw_images_dir / "M1_muestra_baja_concentracion.jpg",
-        num_particles=30,
+        output_path=raw_images_dir / "Textil_A_fibras_largas.jpg",
+        num_particles=50,
         particle_types={
-            'small_round': 0.5,
-            'medium_round': 0.3,
-            'large_round': 0.1,
-            'fiber': 0.1
+            'small_round': 0.05,
+            'medium_round': 0.05,
+            'large_round': 0.05,
+            'fiber': 0.85
         }
     )
     
-    # Muestra 2: Concentración media, distribución equilibrada
+    # Muestra 2: Partículas medianas uniformes
     generate_synthetic_microplastics(
-        output_path=raw_images_dir / "M2_muestra_media_concentracion.jpg",
-        num_particles=45,
+        output_path=raw_images_dir / "Cosmetico_B_particulas_uniformes.jpg",
+        num_particles=65,
         particle_types={
-            'small_round': 0.3,
-            'medium_round': 0.3,
-            'large_round': 0.2,
-            'fiber': 0.2
+            'small_round': 0.1,
+            'medium_round': 0.7,
+            'large_round': 0.15,
+            'fiber': 0.05
         }
     )
     
-    # Muestra 3: Alta concentración, muchas fibras
+    # Muestra 3: Mezcla equilibrada (simulación de muestra real)
     generate_synthetic_microplastics(
-        output_path=raw_images_dir / "M3_muestra_alta_concentracion.jpg",
-        num_particles=60,
+        output_path=raw_images_dir / "Ambiental_C_muestra_real.jpg",
+        num_particles=48,
         particle_types={
-            'small_round': 0.2,
-            'medium_round': 0.3,
-            'large_round': 0.2,
-            'fiber': 0.3
+            'small_round': 0.35,
+            'medium_round': 0.25,
+            'large_round': 0.25,
+            'fiber': 0.15
         }
     )
     
     print("-" * 60)
     print("[OK] Generacion completada exitosamente")
-    print(f"\nLas imagenes estan listas en: {raw_images_dir}")
-    print("\nAhora puedes ejecutar el análisis con estas imágenes de prueba.")
+    print(f"\nLas imagenes adicionales estan listas en: {raw_images_dir}")
+    print("\nAhora tienes 8 imagenes diferentes para analizar.")
     print("="*60 + "\n")
 
 
