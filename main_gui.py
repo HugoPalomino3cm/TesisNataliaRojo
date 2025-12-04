@@ -192,8 +192,18 @@ class MicroplasticAnalysisGUI:
             list_frame,
             yscrollcommand=scrollbar.set,
             height=8,
-            font=("Courier", 10),
-            selectmode=tk.EXTENDED  # Permitir selección múltiple
+            font=("Segoe UI", 10),
+            selectmode=tk.EXTENDED,  # Permitir selección múltiple
+            bg="#ffffff",
+            fg="#2c3e50",
+            selectbackground="#047857",  # Verde moderno
+            selectforeground="#ffffff",
+            activestyle="none",  # Sin estilo de activación por defecto
+            highlightthickness=1,
+            highlightcolor="#047857",
+            highlightbackground="#e0e0e0",
+            borderwidth=0,
+            relief=tk.FLAT
         )
         self.image_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.image_listbox.yview)
