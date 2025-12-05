@@ -18,3 +18,13 @@ seaborn>=0.12.0
 # Utilidades
 openpyxl>=3.1.0  # Para exportar a Excel
 python-dateutil>=2.8.2
+
+# Anotación y etiquetado de imágenes
+labelImg>=1.8.6
+PyQt5>=5.15.0  # Backend para labelImg
+
+# Detección con YOLOv8 (opcional pero recomendado)
+ultralytics>=8.0.0  # YOLOv8
+torch>=2.0.0  # PyTorch para YOLOv8
+torchvision>=0.15.0  # TorchVision para YOLOv8
+pyyaml>=6.0  # Para configuración YOLO

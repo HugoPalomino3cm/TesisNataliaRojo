@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 import sys
+import subprocess
 from pathlib import Path
 import queue
 from PIL import Image, ImageTk
@@ -20,6 +21,7 @@ sys.path.append(str(Path(__file__).parent))
 from src.image_processing import ImageProcessor
 from src.statistical_analysis import StatisticalAnalyzer
 from src.visualization import DataVisualizer
+from src.image_annotation import ImageAnnotator, launch_labelimg_standalone
 from config.config import (
     RAW_IMAGES_DIR, PROCESSED_IMAGES_DIR, GRAPHS_DIR, 
     REPORTS_DIR, IMAGE_PARAMS
@@ -41,6 +43,15 @@ class MicroplasticAnalysisGUI:
         self.image_files = []
         self.analysis_running = False
         self.message_queue = queue.Queue()
+        
+        # Variables para YOLOv8
+        self.yolo_model_path = tk.StringVar(value="")
+        self.yolo_epochs = tk.IntVar(value=100)
+        self.yolo_batch = tk.IntVar(value=16)
+        self.yolo_model_size = tk.StringVar(value='n')
+        
+        # Inicializar anotador de imágenes
+        self.annotator = ImageAnnotator(RAW_IMAGES_DIR)
         
         # Crear interfaz
         self.create_widgets()
@@ -131,17 +142,27 @@ class MicroplasticAnalysisGUI:
         self.notebook.add(config_frame, text="⚙️ Configuración")
         self.create_config_tab(config_frame)
         
-        # Pestaña 2: Análisis
+        # Pestaña 2: Anotación de Imágenes
+        annotation_frame = ttk.Frame(self.notebook)
+        self.notebook.add(annotation_frame, text="🏷️ Anotar Imágenes")
+        self.create_annotation_tab(annotation_frame)
+        
+        # Pestaña 3: Entrenamiento YOLO
+        yolo_frame = ttk.Frame(self.notebook)
+        self.notebook.add(yolo_frame, text="🤖 Entrenar YOLOv8")
+        self.create_yolo_training_tab(yolo_frame)
+        
+        # Pestaña 4: Análisis
         analysis_frame = ttk.Frame(self.notebook)
         self.notebook.add(analysis_frame, text="🔬 Análisis")
         self.create_analysis_tab(analysis_frame)
         
-        # Pestaña 3: Visualización de Gráficos
+        # Pestaña 5: Visualización de Gráficos
         viewer_frame = ttk.Frame(self.notebook)
         self.notebook.add(viewer_frame, text="📊 Ver Gráficos")
         self.create_viewer_tab(viewer_frame)
         
-        # Pestaña 4: Gestión
+        # Pestaña 6: Gestión
         management_frame = ttk.Frame(self.notebook)
         self.notebook.add(management_frame, text="📁 Gestión de Resultados")
         self.create_management_tab(management_frame)
@@ -150,8 +171,21 @@ class MicroplasticAnalysisGUI:
         """Crea la pestaña de configuración."""
         
         # Frame de imágenes
-        img_frame = ttk.LabelFrame(parent, text="📸 Selección de Imágenes", padding=15)
+        img_frame = ttk.LabelFrame(parent, text="📸 Cargar y Anotar Imágenes", padding=15)
         img_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Mensaje informativo
+        info_label = tk.Label(
+            img_frame,
+            text="⚠️ Las imágenes cargadas se abrirán automáticamente en LabelImg para su anotación",
+            font=("Segoe UI", 9, "italic"),
+            fg="#d97706",
+            bg="#fef3c7",
+            padx=10,
+            pady=8,
+            relief=tk.FLAT
+        )
+        info_label.pack(fill=tk.X, pady=(0, 10))
         
         # Frame de botones
         btn_frame = ttk.Frame(img_frame)
@@ -160,7 +194,7 @@ class MicroplasticAnalysisGUI:
         # Botón para buscar imágenes
         btn_browse = ttk.Button(
             btn_frame,
-            text="📂 Buscar Imágenes",
+            text="📤 Cargar Imágenes para Anotar",
             command=self.browse_images
         )
         btn_browse.pack(side=tk.LEFT, padx=5)
@@ -211,7 +245,7 @@ class MicroplasticAnalysisGUI:
         # Botón para usar directorio por defecto
         btn_default = ttk.Button(
             img_frame,
-            text="📁 Usar Carpeta por Defecto (data/raw_images)",
+            text="📁 Cargar Imágenes desde Carpeta por Defecto (data/raw_images)",
             command=self.load_default_images
         )
         btn_default.pack(pady=5)
@@ -338,6 +372,467 @@ class MicroplasticAnalysisGUI:
             text="📄 Abrir Carpeta de Reportes",
             command=lambda: self.open_folder(REPORTS_DIR)
         ).pack(side=tk.LEFT, padx=5)
+    
+    def create_annotation_tab(self, parent):
+        """Crea la pestaña de anotación de imágenes con LabelImg."""
+        
+        # Banner de instrucciones destacado
+        banner_frame = tk.Frame(parent, bg="#047857", height=80)
+        banner_frame.pack(fill=tk.X, padx=0, pady=0)
+        banner_frame.pack_propagate(False)
+        
+        banner_text = tk.Label(
+            banner_frame,
+            text="🏷️ ANOTAR IMÁGENES CON LABELIMG\n"
+                 "Las imágenes cargadas deben ser anotadas antes del análisis",
+            font=("Segoe UI", 12, "bold"),
+            bg="#047857",
+            fg="#ffffff",
+            justify=tk.CENTER
+        )
+        banner_text.pack(expand=True)
+        
+        # Frame de acciones principales (más destacado)
+        action_frame = ttk.LabelFrame(parent, text="🚀 Comenzar Anotación", padding=20)
+        action_frame.pack(fill=tk.X, padx=10, pady=15)
+        
+        # Botón principal GRANDE para abrir LabelImg
+        btn_launch = tk.Button(
+            action_frame,
+            text="🏷️ ABRIR LABELIMG PARA ANOTAR",
+            command=self.launch_labelimg,
+            font=("Segoe UI", 12, "bold"),
+            bg="#047857",
+            fg="#ffffff",
+            activebackground="#065f46",
+            activeforeground="#ffffff",
+            relief=tk.RAISED,
+            borderwidth=3,
+            padx=30,
+            pady=15,
+            cursor="hand2"
+        )
+        btn_launch.pack(pady=10)
+        
+        # Información rápida de uso
+        quick_info = tk.Label(
+            action_frame,
+            text="⌨️ Atajos: W = Nueva caja | Ctrl+S = Guardar | D/A = Navegar",
+            font=("Segoe UI", 9, "italic"),
+            fg="#6b7280"
+        )
+        quick_info.pack(pady=5)
+        
+        # Frame de información de directorios
+        dirs_frame = ttk.Frame(action_frame)
+        dirs_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Label(
+            dirs_frame,
+            text=f"📂 Imágenes: {RAW_IMAGES_DIR}",
+            font=("Segoe UI", 9)
+        ).pack(anchor=tk.W, pady=2)
+        
+        annotations_dir = self.annotator.annotations_dir
+        ttk.Label(
+            dirs_frame,
+            text=f"📝 Anotaciones: {annotations_dir}",
+            font=("Segoe UI", 9)
+        ).pack(anchor=tk.W, pady=2)
+        
+        # Frame de información desplegable
+        info_frame = ttk.LabelFrame(parent, text="ℹ️ Información sobre Anotación", padding=15)
+        info_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        info_text = (
+            "📌 Funcionalidades de LabelImg:\n"
+            "  • Dibujar cajas delimitadoras alrededor de microplásticos\n"
+            "  • Clasificar partículas por tipo\n"
+            "  • Guardar anotaciones en formato XML\n\n"
+            "🎯 Clases predefinidas:\n"
+            "  • fibra: Microplásticos filamentosos\n"
+            "  • fragmento: Pedazos irregulares\n"
+            "  • pelicula: Láminas delgadas\n"
+            "  • esfera: Partículas esféricas\n"
+            "  • microplastico_irregular: Formas no clasificables\n"
+            "  • aglomerado: Conjunto de partículas"
+        )
+        
+        info_label = tk.Label(
+            info_frame,
+            text=info_text,
+            justify=tk.LEFT,
+            font=("Segoe UI", 9),
+            bg="#f8f9fa",
+            fg="#2c3e50"
+        )
+        info_label.pack(fill=tk.BOTH)
+        
+        # Frame de estadísticas
+        stats_frame = ttk.LabelFrame(parent, text="📊 Estadísticas de Anotación", padding=15)
+        stats_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Área de texto para mostrar estadísticas
+        self.annotation_stats_text = scrolledtext.ScrolledText(
+            stats_frame,
+            height=10,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            bg="#ffffff",
+            fg="#2c3e50"
+        )
+        self.annotation_stats_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Botones de utilidades
+        utils_frame = ttk.Frame(stats_frame)
+        utils_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        ttk.Button(
+            utils_frame,
+            text="🔄 Actualizar Estadísticas",
+            command=self.update_annotation_stats
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(
+            utils_frame,
+            text="📁 Abrir Carpeta de Anotaciones",
+            command=lambda: self.open_folder(self.annotator.annotations_dir)
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Botón alternativo usando VBScript (más confiable)
+        ttk.Button(
+            utils_frame,
+            text="🔧 Abrir LabelImg (Método Alternativo)",
+            command=self.launch_labelimg_vbs
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Cargar estadísticas iniciales
+        self.root.after(1000, self.update_annotation_stats)
+    
+    def launch_labelimg(self):
+        """Lanza la herramienta LabelImg."""
+        try:
+            if self.annotator.launch_labelimg():
+                self.log_message("✅ LabelImg lanzado exitosamente")
+                self.log_message("   Cierre LabelImg cuando termine de anotar")
+            else:
+                self.log_message("❌ No se pudo lanzar LabelImg")
+        except Exception as e:
+            self.log_message(f"❌ Error al lanzar LabelImg: {e}")
+            messagebox.showerror("Error", f"Error al lanzar LabelImg:\n{str(e)}")
+    
+    def launch_labelimg_vbs(self):
+        """Lanza LabelImg usando VBScript (método alternativo más confiable)."""
+        try:
+            vbs_file = Path(__file__).parent / "abrir_labelimg.vbs"
+            if vbs_file.exists():
+                subprocess.Popen(['cscript', '//nologo', str(vbs_file)])
+                self.log_message("✅ LabelImg lanzado (método VBScript)")
+                self.log_message("   Cierre LabelImg cuando termine de anotar")
+            else:
+                self.log_message("❌ No se encontró abrir_labelimg.vbs")
+                messagebox.showerror("Error", f"No se encontró el archivo:\n{vbs_file}")
+        except Exception as e:
+            self.log_message(f"❌ Error: {e}")
+            messagebox.showerror("Error", f"Error al lanzar LabelImg:\n{str(e)}")
+    
+    def update_annotation_stats(self):
+        """Actualiza las estadísticas de anotación."""
+        try:
+            stats = self.annotator.get_annotation_stats()
+            
+            # Limpiar texto
+            self.annotation_stats_text.delete(1.0, tk.END)
+            
+            # Insertar estadísticas
+            self.annotation_stats_text.insert(tk.END, "═" * 60 + "\n")
+            self.annotation_stats_text.insert(tk.END, "  RESUMEN DE ANOTACIONES\n")
+            self.annotation_stats_text.insert(tk.END, "═" * 60 + "\n\n")
+            
+            self.annotation_stats_text.insert(tk.END, f"📷 Imágenes anotadas: {stats['total_images']}\n")
+            self.annotation_stats_text.insert(tk.END, f"🎯 Total de objetos etiquetados: {stats['total_objects']}\n\n")
+            
+            if stats['classes']:
+                self.annotation_stats_text.insert(tk.END, "─" * 60 + "\n")
+                self.annotation_stats_text.insert(tk.END, "  DISTRIBUCIÓN POR CLASE\n")
+                self.annotation_stats_text.insert(tk.END, "─" * 60 + "\n\n")
+                
+                for clase, count in sorted(stats['classes'].items(), key=lambda x: x[1], reverse=True):
+                    percentage = (count / stats['total_objects'] * 100) if stats['total_objects'] > 0 else 0
+                    self.annotation_stats_text.insert(
+                        tk.END,
+                        f"  {clase:30s} : {count:4d} ({percentage:5.1f}%)\n"
+                    )
+            else:
+                self.annotation_stats_text.insert(tk.END, "\n⚠️ No hay anotaciones disponibles todavía.\n")
+                self.annotation_stats_text.insert(tk.END, "   Haga clic en 'Abrir LabelImg' para comenzar.\n")
+            
+            self.annotation_stats_text.insert(tk.END, "\n" + "═" * 60 + "\n")
+            
+        except Exception as e:
+            self.annotation_stats_text.delete(1.0, tk.END)
+            self.annotation_stats_text.insert(tk.END, f"❌ Error al obtener estadísticas:\n{str(e)}")
+    
+    def create_yolo_training_tab(self, parent):
+        """Crea la pestaña de entrenamiento YOLOv8."""
+        
+        # Frame de información
+        info_frame = ttk.LabelFrame(parent, text="ℹ️ ¿Qué es el Entrenamiento de YOLOv8?", padding=15)
+        info_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        info_text = tk.Text(info_frame, height=10, wrap=tk.WORD, font=("Segoe UI", 9))
+        info_text.pack(fill=tk.X)
+        info_text.insert(tk.END,
+            "YOLOv8 es una red neuronal que aprende a detectar microplásticos automáticamente.\n\n"
+            
+            "📚 ÉPOCAS: Cuántas veces el modelo ve todas tus imágenes\n"
+            "   • 1 época = ve todas las imágenes 1 vez\n"
+            "   • 100 épocas = ve todas las imágenes 100 veces (aprende mejor)\n"
+            "   • Más épocas = más aprendizaje (pero toma más tiempo)\n\n"
+            
+            "📦 BATCH SIZE: Cuántas imágenes procesa a la vez\n"
+            "   • Batch 8 = procesa 8 imágenes juntas (GPU pequeña)\n"
+            "   • Batch 16 = procesa 16 imágenes (recomendado)\n"
+            "   • Batch 32 = procesa 32 imágenes (GPU grande)\n"
+            "   • Más batch = más rápido PERO necesita más memoria\n\n"
+            
+            "🏗️ TAMAÑO MODELO: Qué tan 'inteligente' es\n"
+            "   • n (nano) = rápido pero básico\n"
+            "   • m (medium) = BALANCE PERFECTO ⭐\n"
+            "   • x (xlarge) = súper preciso pero lento\n\n"
+            
+            "⏱️ TIEMPO: Depende de tus imágenes y configuración\n"
+            "   • 50 imgs + modelo 'n' + 100 épocas ≈ 20 minutos\n"
+            "   • 100 imgs + modelo 'm' + 150 épocas ≈ 1-2 horas\n"
+            "   • 200 imgs + modelo 'x' + 200 épocas ≈ 4-6 horas"
+        )
+        info_text.config(state=tk.DISABLED, bg="#f0f8ff")
+        
+        # Frame de configuración de entrenamiento
+        train_frame = ttk.LabelFrame(parent, text="🚀 Configuración de Entrenamiento", padding=15)
+        train_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Tamaño del modelo
+        size_frame = ttk.Frame(train_frame)
+        size_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(size_frame, text="Tamaño del modelo (cerebro de la IA):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        model_sizes = [
+            ('n (nano - más rápido, ~15min)', 'n'),
+            ('s (small - rápido)', 's'),
+            ('m (medium - RECOMENDADO)', 'm'),
+            ('l (large - más preciso)', 'l'),
+            ('x (xlarge - máxima precisión, ~4hrs)', 'x')
+        ]
+        for text, value in model_sizes:
+            ttk.Radiobutton(
+                size_frame,
+                text=text,
+                variable=self.yolo_model_size,
+                value=value
+            ).pack(side=tk.LEFT, padx=5)
+        
+        # Épocas
+        epoch_frame = ttk.Frame(train_frame)
+        epoch_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(epoch_frame, text="Épocas (cuántas veces ve todas las imágenes):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(epoch_frame, textvariable=self.yolo_epochs, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Label(epoch_frame, text="(100-200 recomendado. Más épocas = mejor aprendizaje)", foreground="gray").pack(side=tk.LEFT)
+        
+        # Batch size
+        batch_frame = ttk.Frame(train_frame)
+        batch_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(batch_frame, text="Batch (imágenes por lote):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(batch_frame, textvariable=self.yolo_batch, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Label(batch_frame, text="(16=recomendado | 8=GPU pequeña | 32=GPU grande)", foreground="gray").pack(side=tk.LEFT)
+        
+        # Botones de entrenamiento
+        btn_frame = ttk.Frame(train_frame)
+        btn_frame.pack(pady=15)
+        
+        ttk.Button(
+            btn_frame,
+            text="🚀 Entrenar Modelo YOLO",
+            command=self.start_yolo_training
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(
+            btn_frame,
+            text="📂 Abrir Carpeta de Modelos",
+            command=lambda: self.open_folder("yolo_training/models")
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Frame de selección de modelo para uso
+        use_frame = ttk.LabelFrame(parent, text="🤖 Seleccionar Modelo YOLO", padding=15)
+        use_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        info_label = tk.Label(
+            use_frame,
+            text="⚠️ IMPORTANTE: Debes seleccionar un modelo entrenado (.pt) para usar el sistema",
+            font=("Segoe UI", 9, "bold"),
+            fg="#dc2626",
+            bg="#fee2e2",
+            padx=10,
+            pady=8
+        )
+        info_label.pack(fill=tk.X, pady=(0, 10))
+        
+        # Selector de modelo
+        model_select_frame = ttk.Frame(use_frame)
+        model_select_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(model_select_frame, text="Modelo entrenado (.pt):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(model_select_frame, textvariable=self.yolo_model_path, width=50, font=("Arial", 10)).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        ttk.Button(
+            model_select_frame,
+            text="📁 Buscar Modelo",
+            command=self.browse_yolo_model
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Consola de entrenamiento
+        console_frame = ttk.LabelFrame(parent, text="📋 Log de Entrenamiento", padding=10)
+        console_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        self.yolo_console = scrolledtext.ScrolledText(
+            console_frame,
+            height=12,
+            font=("Consolas", 9),
+            bg="#1e1e1e",
+            fg="#00ff00",
+            insertbackground="white"
+        )
+        self.yolo_console.pack(fill=tk.BOTH, expand=True)
+    
+    def browse_yolo_model(self):
+        """Busca un modelo YOLO entrenado."""
+        file_path = filedialog.askopenfilename(
+            title="Seleccionar modelo YOLO entrenado",
+            filetypes=[("Modelos PyTorch", "*.pt"), ("Todos los archivos", "*.*")],
+            initialdir="yolo_training/models"
+        )
+        
+        if file_path:
+            self.yolo_model_path.set(file_path)
+            self.log_yolo(f"✅ Modelo seleccionado: {Path(file_path).name}\n")
+            self.log_yolo(f"   Ruta: {file_path}\n")
+            self.log_yolo(f"   Ahora puedes ir a 'Análisis' para procesar imágenes\n\n")
+            messagebox.showinfo(
+                "Modelo Seleccionado",
+                f"Modelo YOLOv8 configurado correctamente:\n\n"
+                f"{Path(file_path).name}\n\n"
+                f"Ve a la pestaña 'Análisis' para procesar imágenes."
+            )
+    
+    def start_yolo_training(self):
+        """Inicia el entrenamiento de YOLO en un hilo separado."""
+        if self.analysis_running:
+            messagebox.showwarning("Advertencia", "Ya hay un proceso en ejecución.")
+            return
+        
+        # Verificar que hay anotaciones
+        stats = self.annotator.get_annotation_stats()
+        if stats['total_images'] == 0:
+            messagebox.showerror(
+                "Error",
+                "No hay imágenes anotadas.\n\n"
+                "Ve a la pestaña 'Anotar Imágenes' y anota algunas imágenes con LabelImg primero."
+            )
+            return
+        
+        # Confirmar
+        response = messagebox.askyesno(
+            "Confirmar Entrenamiento",
+            f"Se entrenarán {stats['total_images']} imágenes anotadas con {stats['total_objects']} objetos.\n\n"
+            f"Configuración:\n"
+            f"- Modelo: YOLOv8{self.yolo_model_size.get()}\n"
+            f"- Épocas: {self.yolo_epochs.get()}\n"
+            f"- Batch: {self.yolo_batch.get()}\n\n"
+            f"⚠️ Esto puede tomar varios minutos u horas.\n\n"
+            f"¿Continuar?"
+        )
+        
+        if not response:
+            return
+        
+        self.analysis_running = True
+        self.yolo_console.delete(1.0, tk.END)
+        self.log_yolo("🚀 Iniciando entrenamiento YOLOv8...\n")
+        self.log_yolo("="*60 + "\n\n")
+        
+        # Ejecutar en hilo separado
+        thread = threading.Thread(target=self.run_yolo_training, daemon=True)
+        thread.start()
+    
+    def run_yolo_training(self):
+        """Ejecuta el entrenamiento YOLO."""
+        try:
+            from src.train_yolo import YOLOTrainer
+            
+            self.log_yolo("📦 Inicializando entrenador YOLO...\n")
+            
+            trainer = YOLOTrainer(
+                annotations_dir=str(RAW_IMAGES_DIR),
+                images_dir=str(RAW_IMAGES_DIR),
+                output_dir="yolo_training"
+            )
+            
+            self.log_yolo("✅ Entrenador inicializado\n\n")
+            self.log_yolo("📋 Convirtiendo anotaciones VOC a formato YOLO...\n")
+            
+            # Convertir dataset
+            data_yaml = trainer.convert_voc_to_yolo()
+            self.log_yolo(f"✅ Dataset convertido: {data_yaml}\n\n")
+            
+            # Entrenar
+            self.log_yolo("🎯 Iniciando entrenamiento...\n")
+            self.log_yolo("   (Esto puede tomar mucho tiempo)\n\n")
+            
+            best_model = trainer.train_model(
+                data_yaml=data_yaml,
+                model_size=self.yolo_model_size.get(),
+                epochs=self.yolo_epochs.get(),
+                batch=self.yolo_batch.get(),
+                device='0'  # GPU si está disponible
+            )
+            
+            self.log_yolo("\n" + "="*60 + "\n")
+            self.log_yolo("🎉 ENTRENAMIENTO COMPLETADO\n")
+            self.log_yolo("="*60 + "\n\n")
+            self.log_yolo(f"📦 Modelo guardado en:\n   {best_model}\n\n")
+            
+            # Actualizar path del modelo
+            self.yolo_model_path.set(best_model)
+            
+            # Evaluar
+            self.log_yolo("📊 Evaluando modelo...\n")
+            trainer.evaluate_model(best_model, data_yaml)
+            
+            self.log_yolo("\n✅ Proceso completado exitosamente\n")
+            self.log_yolo("💡 Ahora puedes usar este modelo en la pestaña de Análisis\n")
+            
+            messagebox.showinfo(
+                "Entrenamiento Completado",
+                f"El modelo ha sido entrenado exitosamente.\n\n"
+                f"Modelo guardado en:\n{best_model}\n\n"
+                f"Ve a la pestaña de Análisis y activa 'Usar YOLOv8'"
+            )
+            
+        except ImportError as e:
+            self.log_yolo(f"\n❌ ERROR: ultralytics no está instalado\n")
+            self.log_yolo(f"   Ejecuta: pip install ultralytics torch torchvision\n")
+            messagebox.showerror("Error", f"Falta ultralytics:\n{str(e)}\n\nEjecuta:\npip install ultralytics")
+            
+        except Exception as e:
+            self.log_yolo(f"\n❌ ERROR durante el entrenamiento:\n{str(e)}\n")
+            messagebox.showerror("Error", f"Error durante el entrenamiento:\n{str(e)}")
+            
+        finally:
+            self.analysis_running = False
+    
+    def log_yolo(self, message):
+        """Agrega mensaje a la consola YOLO."""
+        self.yolo_console.insert(tk.END, message)
+        self.yolo_console.see(tk.END)
+        self.root.update_idletasks()
     
     def create_viewer_tab(self, parent):
         """Crea la pestaña de visualización de gráficos."""
@@ -511,6 +1006,9 @@ class MicroplasticAnalysisGUI:
         graph_names = [f.name for f in filtered_files]
         self.graph_combo['values'] = graph_names
         
+        # Mensaje informativo
+        self.log_console(f"[INFO] Se encontraron {len(graph_names)} graficos en la categoria '{filter_value}'\n")
+        
         # Seleccionar el primero
         if graph_names:
             self.graph_combo.current(0)
@@ -675,9 +1173,9 @@ class MicroplasticAnalysisGUI:
         self.root.after(1000, self.update_results_info)
     
     def browse_images(self):
-        """Abre diálogo para seleccionar imágenes."""
+        """Abre diálogo para seleccionar imágenes y luego abre LabelImg para anotarlas."""
         files = filedialog.askopenfilenames(
-            title="Seleccionar imagenes microscopicas",
+            title="Seleccionar imágenes microscópicas para anotar",
             filetypes=[
                 ("Imagenes", "*.jpg *.jpeg *.png *.tif *.tiff *.bmp"),
                 ("Todos los archivos", "*.*")
@@ -685,18 +1183,50 @@ class MicroplasticAnalysisGUI:
         )
         
         if files:
-            # Validar que los archivos existen
-            valid_files = [f for f in files if Path(f).exists() and Path(f).is_file()]
-            self.image_files = valid_files
-            self.update_image_list()
+            # Copiar archivos seleccionados a data/raw_images si no están ahí
+            copied_files = []
+            for file_path in files:
+                source = Path(file_path)
+                if source.exists() and source.is_file():
+                    # Si el archivo no está en raw_images, copiarlo
+                    if not str(source.parent).endswith('raw_images'):
+                        dest = RAW_IMAGES_DIR / source.name
+                        try:
+                            import shutil
+                            shutil.copy2(source, dest)
+                            copied_files.append(str(dest))
+                            self.log_console(f"[✓] Copiado: {source.name}\n")
+                        except Exception as e:
+                            self.log_console(f"[✗] Error al copiar {source.name}: {e}\n")
+                    else:
+                        copied_files.append(str(source))
             
-            if valid_files:
-                self.log_console(f"[OK] Seleccionadas {len(valid_files)} imagenes\n")
+            # Actualizar lista de imágenes
+            if copied_files:
+                self.image_files.extend(copied_files)
+                self.image_files = list(set(self.image_files))  # Eliminar duplicados
+                self.update_image_list()
+                self.log_console(f"[OK] {len(copied_files)} imagen(es) lista(s) para anotar\n")
+                
+                # Preguntar si desea abrir LabelImg
+                respuesta = messagebox.askyesno(
+                    "Anotar Imágenes",
+                    f"Se han cargado {len(copied_files)} imagen(es).\n\n"
+                    "¿Desea abrir LabelImg para anotarlas ahora?",
+                    icon='question'
+                )
+                
+                if respuesta:
+                    self.log_console("[→] Abriendo LabelImg para anotar imágenes...\n")
+                    # Cambiar a la pestaña de anotación
+                    self.notebook.select(1)  # Pestaña de anotación (índice 1)
+                    # Abrir LabelImg
+                    self.root.after(500, self.launch_labelimg)
             else:
-                self.log_console(f"[!] No se encontraron archivos validos\n")
+                self.log_console(f"[!] No se pudieron cargar las imágenes\n")
     
     def load_default_images(self):
-        """Carga imágenes de la carpeta por defecto."""
+        """Carga imágenes de la carpeta por defecto y abre LabelImg."""
         image_extensions = ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']
         temp_files = []
         
@@ -711,9 +1241,29 @@ class MicroplasticAnalysisGUI:
         self.update_image_list()
         
         if self.image_files:
-            self.log_console(f"[OK] Cargadas {len(self.image_files)} imagenes de {RAW_IMAGES_DIR}\n")
+            self.log_console(f"[OK] Cargadas {len(self.image_files)} imágenes de {RAW_IMAGES_DIR}\n")
+            
+            # Preguntar si desea abrir LabelImg
+            respuesta = messagebox.askyesno(
+                "Anotar Imágenes",
+                f"Se han cargado {len(self.image_files)} imagen(es) desde la carpeta por defecto.\n\n"
+                "¿Desea abrir LabelImg para anotarlas ahora?",
+                icon='question'
+            )
+            
+            if respuesta:
+                self.log_console("[→] Abriendo LabelImg para anotar imágenes...\n")
+                # Cambiar a la pestaña de anotación
+                self.notebook.select(1)  # Pestaña de anotación (índice 1)
+                # Abrir LabelImg
+                self.root.after(500, self.launch_labelimg)
         else:
-            self.log_console(f"[!] No se encontraron imagenes en {RAW_IMAGES_DIR}\n")
+            self.log_console(f"[!] No se encontraron imágenes en {RAW_IMAGES_DIR}\n")
+            messagebox.showwarning(
+                "Sin imágenes",
+                f"No se encontraron imágenes en:\n{RAW_IMAGES_DIR}\n\n"
+                "Use 'Cargar Imágenes para Anotar' para agregar imágenes."
+            )
     
     def update_image_list(self):
         """Actualiza la lista de imagenes en la interfaz."""
@@ -778,6 +1328,29 @@ class MicroplasticAnalysisGUI:
             self.log_console("[!] No hay imagenes cargadas. Usa el boton 'Usar Carpeta por Defecto' primero.\n")
             return
         
+        # Validar que hay un modelo YOLO seleccionado
+        if not self.yolo_model_path.get():
+            messagebox.showerror(
+                "Error: Modelo No Seleccionado",
+                "⚠️ Debes seleccionar un modelo YOLOv8 entrenado primero.\n\n"
+                "Ve a la pestaña 'Entrenar YOLOv8' y:\n"
+                "1. Entrena un modelo (si no tienes uno)\n"
+                "2. Haz clic en 'Buscar Modelo' para seleccionarlo"
+            )
+            self.log_console("[!] ERROR: No hay modelo YOLO seleccionado.\n")
+            self.log_console("   Ve a 'Entrenar YOLOv8' y selecciona un modelo .pt\n")
+            return
+        
+        # Validar que el archivo existe
+        if not Path(self.yolo_model_path.get()).exists():
+            messagebox.showerror(
+                "Error: Modelo No Encontrado",
+                f"❌ El modelo seleccionado no existe:\n\n{self.yolo_model_path.get()}\n\n"
+                "Selecciona un modelo válido en la pestaña 'Entrenar YOLOv8'."
+            )
+            self.log_console(f"[!] ERROR: Modelo no encontrado: {self.yolo_model_path.get()}\n")
+            return
+        
         if self.analysis_running:
             self.log_console("[!] Ya hay un analisis en ejecucion.\n")
             return
@@ -802,16 +1375,27 @@ class MicroplasticAnalysisGUI:
             from src.visualization import DataVisualizer
             
             self.message_queue.put("="*60 + "\n")
-            self.message_queue.put("[INICIO] ANALISIS DE MICROPLASTICOS\n")
+            self.message_queue.put("[INICIO] ANALISIS DE MICROPLASTICOS CON YOLOv8\n")
             self.message_queue.put("="*60 + "\n\n")
+            
+            # Mostrar información del modelo
+            model_name = Path(self.yolo_model_path.get()).name
+            self.message_queue.put(f"🤖 Método de detección: YOLOv8\n")
+            self.message_queue.put(f"📦 Modelo: {model_name}\n")
+            self.message_queue.put(f"📏 Calibración: {self.pixels_to_um.get():.4f} μm/píxel\n")
+            self.message_queue.put("\n")
             
             # Crear sistema inline
             class MicroplasticAnalysisSystem:
-                def __init__(self, pixels_to_um):
-                    self.processor = ImageProcessor(pixels_to_um)
-                    self.analyzer = StatisticalAnalyzer()
-                    self.visualizer = DataVisualizer()
-                    self.results = {}
+                def __init__(self_inner, pixels_to_um, yolo_model_path):
+                    # Usar self_inner para evitar conflicto con self externo
+                    self_inner.processor = ImageProcessor(
+                        pixels_to_um=pixels_to_um,
+                        yolo_model_path=yolo_model_path
+                    )
+                    self_inner.analyzer = StatisticalAnalyzer()
+                    self_inner.visualizer = DataVisualizer()
+                    self_inner.results = {}
                 
                 def analyze_single_sample(self, image_path, sample_id):
                     """Analiza una única muestra."""
@@ -939,8 +1523,11 @@ class MicroplasticAnalysisGUI:
             # Vincular message_queue al sistema
             MicroplasticAnalysisSystem.message_queue = self.message_queue
             
-            # Crear sistema
-            system = MicroplasticAnalysisSystem(pixels_to_um=self.pixels_to_um.get())
+            # Crear sistema con configuración YOLO
+            system = MicroplasticAnalysisSystem(
+                pixels_to_um=self.pixels_to_um.get(),
+                yolo_model_path=self.yolo_model_path.get()
+            )
             
             # Preparar muestras
             samples = {}
@@ -964,8 +1551,8 @@ class MicroplasticAnalysisGUI:
             self.message_queue.put(f"  - Graficos: {GRAPHS_DIR}\n")
             self.message_queue.put(f"  - Reportes: {REPORTS_DIR}\n\n")
             
-            # Cambiar a pestaña de gráficos automáticamente
-            self.root.after(0, lambda: self.notebook.select(1))
+            # Cambiar a pestaña de gráficos automáticamente (ahora es índice 4)
+            self.root.after(0, lambda: self.notebook.select(4))
             
         except Exception as e:
             import traceback
@@ -1269,13 +1856,15 @@ class MicroplasticAnalysisGUI:
     def open_folder(self, folder_path):
         """Abre una carpeta en el explorador."""
         import os
+        import subprocess
         import platform
         
         folder_path = Path(folder_path)
         folder_path.mkdir(parents=True, exist_ok=True)
         
         if platform.system() == "Windows":
-            os.startfile(folder_path)
+            # Usar explorer.exe para asegurar que se abra la carpeta
+            subprocess.Popen(f'explorer "{folder_path}"')
         elif platform.system() == "Darwin":  # macOS
             os.system(f'open "{folder_path}"')
         else:  # Linux

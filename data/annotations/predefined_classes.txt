@@ -1,0 +1,6 @@
+fibra
+fragmento
+pelicula
+esfera
+microplastico_irregular
+aglomerado
