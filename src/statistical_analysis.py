@@ -151,6 +151,48 @@ class StatisticalAnalyzer:
         
         return shape_stats
     
+    def analyze_class_distribution(self, df: pd.DataFrame) -> Dict:
+        """
+        Analiza la distribución de tipos/clases de microplásticos.
+        
+        Args:
+            df: DataFrame con datos de partículas (debe tener columna 'class_name').
+            
+        Returns:
+            Diccionario con análisis de distribución de tipos.
+        """
+        # Verificar si existe la columna class_name
+        if 'class_name' not in df.columns:
+            return {
+                'error': 'No se encontró información de clase. Se requiere detección con YOLOv8.'
+            }
+        
+        class_stats = {}
+        total = len(df)
+        
+        # Distribución por tipo/clase
+        class_distribution = df['class_name'].value_counts().to_dict()
+        class_stats['distribution'] = class_distribution
+        
+        # Porcentajes
+        class_stats['percentages'] = {
+            cls: (count / total * 100) for cls, count in class_distribution.items()
+        }
+        
+        # Estadísticas por cada tipo
+        class_stats['by_class'] = {}
+        for class_name in class_distribution.keys():
+            class_df = df[df['class_name'] == class_name]
+            class_stats['by_class'][class_name] = {
+                'count': len(class_df),
+                'percentage': len(class_df) / total * 100,
+                'area_stats': self.calculate_descriptive_stats(class_df, 'area_um2'),
+                'diameter_stats': self.calculate_descriptive_stats(class_df, 'equivalent_diameter_um'),
+                'aspect_ratio_stats': self.calculate_descriptive_stats(class_df, 'aspect_ratio'),
+            }
+        
+        return class_stats
+    
     def compare_samples(self, dfs: Dict[str, pd.DataFrame],
                        parameter: str = 'area_um2') -> Dict:
         """
@@ -276,6 +318,19 @@ class StatisticalAnalyzer:
         # Información general
         report.append(f"Número total de partículas detectadas: {len(df)}")
         report.append("")
+        
+        # Análisis por tipo de microplástico (si está disponible)
+        if 'class_name' in df.columns:
+            class_analysis = self.analyze_class_distribution(df)
+            if 'error' not in class_analysis:
+                report.append(f"DISTRIBUCIÓN POR TIPO DE MICROPLÁSTICO")
+                report.append("-" * 60)
+                for class_name, stats in class_analysis['by_class'].items():
+                    report.append(f"{class_name}:")
+                    report.append(f"  Cantidad: {stats['count']} ({stats['percentage']:.1f}%)")
+                    report.append(f"  Área promedio: {stats['area_stats']['mean']:.2f} ± {stats['area_stats']['std']:.2f} μm²")
+                    report.append(f"  Diámetro promedio: {stats['diameter_stats']['mean']:.2f} ± {stats['diameter_stats']['std']:.2f} μm")
+                    report.append("")
         
         # Análisis de tamaño
         report.append("DISTRIBUCIÓN DE TAMAÑOS:")

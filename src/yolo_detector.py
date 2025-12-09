@@ -223,7 +223,7 @@ class YOLODetector:
             particle: Diccionario con propiedades de la partícula.
             x1, y1, x2, y2: Coordenadas del bounding box.
         """
-        # Color según clase
+        # Color según clase (BGR para OpenCV)
         colors = {
             'fibra': (255, 0, 0),          # Azul
             'fragmento': (0, 255, 0),       # Verde
@@ -233,8 +233,34 @@ class YOLODetector:
             'aglomerado': (128, 0, 128)     # Púrpura
         }
         
+        # Colores adicionales para clases nuevas (BGR)
+        extra_colors = [
+            (212, 182, 6),    # Cyan
+            (22, 115, 249),   # Naranja oscuro
+            (246, 92, 139),   # Violeta
+            (153, 72, 236),   # Rosa
+            (166, 184, 20),   # Teal
+            (11, 158, 245),   # Ámbar
+            (22, 204, 132),   # Lima
+            (241, 102, 99),   # Índigo
+            (247, 85, 168),   # Púrpura claro
+            (68, 68, 239),    # Rojo claro
+            (129, 185, 16),   # Esmeralda
+            (246, 130, 59),   # Azul claro
+            (239, 70, 217),   # Fucsia
+            (238, 211, 34),   # Cyan claro
+            (21, 204, 250),   # Amarillo oro
+        ]
+        
         class_name = particle['class_name']
-        color = colors.get(class_name, (255, 255, 255))
+        
+        # Obtener color o generar uno automáticamente
+        if class_name in colors:
+            color = colors[class_name]
+        else:
+            # Generar color basado en hash del nombre para consistencia
+            hash_val = hash(class_name) % len(extra_colors)
+            color = extra_colors[hash_val]
         
         # Dibujar bounding box
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)

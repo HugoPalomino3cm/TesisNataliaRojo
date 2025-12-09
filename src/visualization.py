@@ -321,6 +321,187 @@ class DataVisualizer:
         
         return fig
     
+    def plot_class_distribution(self, df: pd.DataFrame,
+                                  sample_id: str = None,
+                                  save_path: str = None) -> plt.Figure:
+        """
+        Genera gráficos de distribución por tipo/clase de microplástico.
+        
+        Args:
+            df: DataFrame con datos de partículas (debe tener columna 'class_name').
+            sample_id: Identificador de la muestra.
+            save_path: Ruta para guardar la figura.
+            
+        Returns:
+            Figura de matplotlib.
+        """
+        # Verificar si existe la columna class_name
+        if 'class_name' not in df.columns:
+            print("⚠️ No se encontró información de clase. El análisis requiere detección con YOLOv8.")
+            return None
+        
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        
+        # Definir colores predefinidos para tipos conocidos
+        colors_map = {
+            'fibra': '#2563eb',          # Azul
+            'fragmento': '#16a34a',       # Verde
+            'pelicula': '#eab308',        # Amarillo
+            'esfera': '#dc2626',          # Rojo
+            'microplastico_irregular': '#9333ea',  # Púrpura
+            'aglomerado': '#ea580c'       # Naranja
+        }
+        
+        # Paleta de colores adicionales para tipos nuevos
+        extra_colors = [
+            '#06b6d4',  # Cyan
+            '#f97316',  # Naranja oscuro
+            '#8b5cf6',  # Violeta
+            '#ec4899',  # Rosa
+            '#14b8a6',  # Teal
+            '#f59e0b',  # Ámbar
+            '#84cc16',  # Lima
+            '#6366f1',  # Índigo
+            '#a855f7',  # Púrpura claro
+            '#ef4444',  # Rojo claro
+            '#10b981',  # Esmeralda
+            '#3b82f6',  # Azul claro
+            '#d946ef',  # Fucsia
+            '#22d3ee',  # Cyan claro
+            '#facc15',  # Amarillo oro
+        ]
+        
+        # 1. Gráfico de barras con conteo
+        class_counts = df['class_name'].value_counts()
+        
+        # Generar colores automáticamente para clases nuevas
+        colors = []
+        extra_color_idx = 0
+        for cls in class_counts.index:
+            if cls in colors_map:
+                colors.append(colors_map[cls])
+            else:
+                # Asignar color nuevo automáticamente
+                colors.append(extra_colors[extra_color_idx % len(extra_colors)])
+                colors_map[cls] = extra_colors[extra_color_idx % len(extra_colors)]
+                extra_color_idx += 1
+        
+        axes[0, 0].bar(range(len(class_counts)), class_counts.values,
+                      color=colors, edgecolor='black', alpha=0.8, linewidth=1.5)
+        axes[0, 0].set_xticks(range(len(class_counts)))
+        axes[0, 0].set_xticklabels(class_counts.index, rotation=45, ha='right')
+        axes[0, 0].set_ylabel('Número de Partículas', fontsize=11, fontweight='bold')
+        axes[0, 0].set_title('Distribución por Tipo de Microplástico', fontsize=12, fontweight='bold')
+        axes[0, 0].grid(True, alpha=0.3, axis='y')
+        
+        # Agregar valores sobre las barras
+        for i, v in enumerate(class_counts.values):
+            axes[0, 0].text(i, v, str(v), ha='center', va='bottom', fontweight='bold')
+        
+        # 2. Gráfico de pastel con porcentajes
+        total = len(df)
+        percentages = (class_counts / total * 100)
+        
+        wedges, texts, autotexts = axes[0, 1].pie(
+            class_counts.values,
+            labels=class_counts.index,
+            autopct='%1.1f%%',
+            startangle=90,
+            colors=colors,
+            explode=[0.05] * len(class_counts),
+            shadow=True
+        )
+        
+        # Mejorar formato del texto
+        for text in texts:
+            text.set_fontsize(10)
+            text.set_fontweight('bold')
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontsize(10)
+            autotext.set_fontweight('bold')
+        
+        axes[0, 1].set_title('Proporción de Tipos de Microplástico', fontsize=12, fontweight='bold')
+        
+        # 3. Tabla con estadísticas por tipo
+        axes[1, 0].axis('off')
+        
+        stats_data = []
+        for class_name in class_counts.index:
+            class_df = df[df['class_name'] == class_name]
+            count = len(class_df)
+            percentage = (count / total * 100)
+            avg_area = class_df['area_um2'].mean()
+            avg_diameter = class_df['equivalent_diameter_um'].mean()
+            
+            stats_data.append([
+                class_name,
+                count,
+                f'{percentage:.1f}%',
+                f'{avg_area:.1f}',
+                f'{avg_diameter:.1f}'
+            ])
+        
+        table = axes[1, 0].table(
+            cellText=stats_data,
+            colLabels=['Tipo', 'Cantidad', '%', 'Área Prom.\n(μm²)', 'Diám. Prom.\n(μm)'],
+            cellLoc='center',
+            loc='center',
+            bbox=[0, 0, 1, 1]
+        )
+        
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 2)
+        
+        # Colorear encabezados
+        for i in range(5):
+            table[(0, i)].set_facecolor('#047857')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Colorear filas alternadas
+        for i, class_name in enumerate(class_counts.index, start=1):
+            color = colors_map.get(class_name, '#f3f4f6')
+            for j in range(5):
+                table[(i, j)].set_facecolor(color if j == 0 else '#ffffff')
+                if j == 0:
+                    table[(i, j)].set_text_props(weight='bold', color='white')
+        
+        axes[1, 0].set_title('Estadísticas por Tipo', fontsize=12, fontweight='bold', pad=20)
+        
+        # 4. Comparación de tamaños por tipo (boxplot)
+        class_names_ordered = class_counts.index.tolist()
+        data_for_boxplot = [df[df['class_name'] == cn]['area_um2'].values 
+                           for cn in class_names_ordered]
+        
+        bp = axes[1, 1].boxplot(data_for_boxplot, labels=class_names_ordered,
+                               patch_artist=True, showmeans=True)
+        
+        # Colorear boxes
+        for patch, class_name in zip(bp['boxes'], class_names_ordered):
+            patch.set_facecolor(colors_map.get(class_name, '#6b7280'))
+            patch.set_alpha(0.7)
+        
+        axes[1, 1].set_xticklabels(class_names_ordered, rotation=45, ha='right')
+        axes[1, 1].set_ylabel('Área (μm²)', fontsize=11, fontweight='bold')
+        axes[1, 1].set_title('Distribución de Tamaños por Tipo', fontsize=12, fontweight='bold')
+        axes[1, 1].grid(True, alpha=0.3, axis='y')
+        
+        # Título general
+        if sample_id:
+            fig.suptitle(f'Análisis de Tipos de Microplásticos - {sample_id}',
+                        fontsize=16, fontweight='bold')
+        else:
+            fig.suptitle('Análisis de Tipos de Microplásticos',
+                        fontsize=16, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, bbox_inches='tight', dpi=PLOT_PARAMS['dpi'])
+        
+        return fig
+    
     def _get_parameter_label(self, parameter: str) -> str:
         """Convierte nombre de parámetro a etiqueta legible."""
         labels = {
@@ -360,12 +541,33 @@ class DataVisualizer:
         ax1.set_title('Distribución de Áreas')
         ax1.grid(True, alpha=0.3)
         
-        # 2. Distribución por categorías de tamaño
+        # 2. Distribución por tipo de microplástico (si está disponible)
         ax2 = fig.add_subplot(gs[0, 1])
-        size_counts = df['size_category'].value_counts()
-        ax2.pie(size_counts.values, labels=size_counts.index, autopct='%1.1f%%',
-               startangle=90)
-        ax2.set_title('Categorías de Tamaño')
+        if 'class_name' in df.columns:
+            class_counts = df['class_name'].value_counts()
+            colors_map = {
+                'fibra': '#2563eb', 'fragmento': '#16a34a', 'pelicula': '#eab308',
+                'esfera': '#dc2626', 'microplastico_irregular': '#9333ea', 'aglomerado': '#ea580c'
+            }
+            # Paleta de colores adicionales para nuevos tipos
+            extra_colors = ['#06b6d4', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b',
+                           '#84cc16', '#6366f1', '#a855f7', '#ef4444', '#10b981', '#3b82f6']
+            colors = []
+            extra_idx = 0
+            for cls in class_counts.index:
+                if cls in colors_map:
+                    colors.append(colors_map[cls])
+                else:
+                    colors.append(extra_colors[extra_idx % len(extra_colors)])
+                    extra_idx += 1
+            ax2.pie(class_counts.values, labels=class_counts.index, autopct='%1.1f%%',
+                   startangle=90, colors=colors)
+            ax2.set_title('Tipos de Microplástico')
+        else:
+            size_counts = df['size_category'].value_counts()
+            ax2.pie(size_counts.values, labels=size_counts.index, autopct='%1.1f%%',
+                   startangle=90)
+            ax2.set_title('Categorías de Tamaño')
         
         # 3. Distribución por categorías de forma
         ax3 = fig.add_subplot(gs[0, 2])

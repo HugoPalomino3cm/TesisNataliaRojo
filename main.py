@@ -1419,6 +1419,12 @@ class MicroplasticAnalysisGUI:
                     # 3. Generar visualizaciones
                     self.message_queue.put("3. Generando visualizaciones...\n")
                     
+                    # Gráfico de distribución por TIPO de microplástico
+                    if 'class_name' in df.columns:
+                        class_plot_path = GRAPHS_DIR / f"{sample_id}_class_distribution.png"
+                        self.visualizer.plot_class_distribution(df, sample_id, str(class_plot_path))
+                        self.message_queue.put(f"   ✓ Guardado: {class_plot_path.name}\n")
+                    
                     size_plot_path = GRAPHS_DIR / f"{sample_id}_size_distribution.png"
                     self.visualizer.plot_size_distribution(df, sample_id, str(size_plot_path))
                     self.message_queue.put(f"   ✓ Guardado: {size_plot_path.name}\n")
