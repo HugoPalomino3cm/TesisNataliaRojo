@@ -16,7 +16,6 @@ try:
     YOLO_AVAILABLE = True
 except ImportError:
     YOLO_AVAILABLE = False
-    print("⚠️ ultralytics no está instalado. Ejecuta: pip install ultralytics")
 
 sys.path.append(str(Path(__file__).parent.parent))
 from config.config import IMAGE_PARAMS
