@@ -82,84 +82,35 @@ class ImageAnnotator:
             print(f"  - Directorio de anotaciones: {self.annotations_dir}")
             print(f"  - Clases predefinidas: {self.predefined_classes_file}")
             
-            # Método simplificado: usar start en Windows
-            if os.name == 'nt':  # Windows
-                try:
-                    # Crear un script VBS temporal para abrir sin ventana CMD
-                    vbs_script = self.annotations_dir / "launch_temp.vbs"
-                    vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "cmd /c labelImg ""{self.images_dir}"" ""{self.predefined_classes_file}"" ""{self.annotations_dir}""", 0, False
-'''
-                    with open(vbs_script, 'w') as f:
-                        f.write(vbs_content)
+            # Usar el script abrir_labelimg.bat
+            try:
+                bat_path = Path(__file__).parent.parent / "abrir_labelimg.bat"
+                
+                if bat_path.exists():
+                    # Ejecutar el archivo batch en un proceso separado
+                    process = subprocess.Popen(
+                        [str(bat_path)],
+                        creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0,
+                        cwd=str(bat_path.parent),
+                        shell=True
+                    )
                     
-                    # Ejecutar el VBS
-                    subprocess.Popen(['cscript', '//nologo', str(vbs_script)], 
-                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-                    
-                    print("✓ LabelImg iniciado correctamente")
+                    print("✓ LabelImg iniciando desde repositorio clonado...")
+                    print("  Revisa si se abrió una nueva ventana")
                     return True
+                else:
+                    raise FileNotFoundError(f"No se encontró {bat_path}")
                     
-                except Exception as e:
-                    print(f"Método VBS falló: {e}")
-                    # Método alternativo: usar comando directo
-                    try:
-                        import winreg
-                        # Obtener el ejecutable de Python
-                        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                                           r"SOFTWARE\Python\PythonCore", 0, 
-                                           winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
-                        # Cerrar la key
-                        winreg.CloseKey(key)
-                        
-                        # Usar subprocess sin shell
-                        cmd_str = f'cmd /c start /B labelImg "{self.images_dir}" "{self.predefined_classes_file}" "{self.annotations_dir}"'
-                        os.system(cmd_str)
-                        print("✓ LabelImg iniciado (método alternativo)")
-                        return True
-                    except Exception as e2:
-                        print(f"Método alternativo falló: {e2}")
-                        # Último recurso: abrir sin parámetros
-                        try:
-                            os.system('start labelImg')
-                            messagebox.showinfo(
-                                "LabelImg Abierto",
-                                "LabelImg se abrió sin parámetros.\n\n"
-                                "Desde LabelImg:\n"
-                                "1. Haga clic en 'Open Dir'\n"
-                                f"2. Navegue a: {self.images_dir}\n"
-                                "3. Haga clic en 'Change Save Dir':\n"
-                                f"   {self.annotations_dir}"
-                            )
-                            print("✓ LabelImg iniciado sin parámetros")
-                            return True
-                        except Exception as e3:
-                            print(f"Todos los métodos fallaron: {e3}")
-                            raise
-            else:  # Linux/Mac
-                cmd = [
-                    "labelImg",
-                    str(self.images_dir),
-                    str(self.predefined_classes_file),
-                    str(self.annotations_dir)
-                ]
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL
+            except Exception as e:
+                print(f"Error: {e}")
+                messagebox.showwarning(
+                    "Usa el archivo batch",
+                    f"No se pudo abrir desde aquí.\n\n"
+                    f"SOLUCIÓN:\n"
+                    f"Haz doble clic en: abrir_labelimg.bat\n\n"
+                    f"(Está en la carpeta principal del proyecto)"
                 )
-                print("✓ LabelImg iniciado correctamente")
-                return True
-            
-        except FileNotFoundError:
-            messagebox.showerror(
-                "Error",
-                "LabelImg no está instalado.\n\n"
-                "Por favor, ejecute:\n"
-                "pip install labelImg PyQt5"
-            )
-            return False
+                return False
             
         except Exception as e:
             error_msg = str(e)
@@ -244,6 +195,18 @@ def launch_labelimg_standalone(images_dir=None, annotations_dir=None):
     
     annotator = ImageAnnotator(images_dir, annotations_dir)
     annotator.launch_labelimg()
+
+
+def find_labelimg_executable():
+    """Busca el ejecutable de labelImg en el PATH."""
+    try:
+        # Usar 'where' en Windows para encontrar el ejecutable
+        result = subprocess.run(['where', 'labelImg'], capture_output=True, text=True, check=True, shell=True)
+        # 'where' puede devolver múltiples rutas, tomar la primera
+        path = result.stdout.strip().split('\n')[0]
+        return path
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
 
 
 if __name__ == "__main__":

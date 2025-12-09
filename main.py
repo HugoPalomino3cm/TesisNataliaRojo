@@ -513,12 +513,12 @@ class MicroplasticAnalysisGUI:
         """Lanza la herramienta LabelImg."""
         try:
             if self.annotator.launch_labelimg():
-                self.log_message("✅ LabelImg lanzado exitosamente")
-                self.log_message("   Cierre LabelImg cuando termine de anotar")
+                self.log_console("✅ LabelImg lanzado exitosamente\n")
+                self.log_console("   Cierre LabelImg cuando termine de anotar\n")
             else:
-                self.log_message("❌ No se pudo lanzar LabelImg")
+                self.log_console("❌ No se pudo lanzar LabelImg\n")
         except Exception as e:
-            self.log_message(f"❌ Error al lanzar LabelImg: {e}")
+            self.log_console(f"❌ Error al lanzar LabelImg: {e}\n")
             messagebox.showerror("Error", f"Error al lanzar LabelImg:\n{str(e)}")
     
     def launch_labelimg_vbs(self):
@@ -527,13 +527,13 @@ class MicroplasticAnalysisGUI:
             vbs_file = Path(__file__).parent / "abrir_labelimg.vbs"
             if vbs_file.exists():
                 subprocess.Popen(['cscript', '//nologo', str(vbs_file)])
-                self.log_message("✅ LabelImg lanzado (método VBScript)")
-                self.log_message("   Cierre LabelImg cuando termine de anotar")
+                self.log_console("✅ LabelImg lanzado (método VBScript)\n")
+                self.log_console("   Cierre LabelImg cuando termine de anotar\n")
             else:
-                self.log_message("❌ No se encontró abrir_labelimg.vbs")
+                self.log_console("❌ No se encontró abrir_labelimg.vbs\n")
                 messagebox.showerror("Error", f"No se encontró el archivo:\n{vbs_file}")
         except Exception as e:
-            self.log_message(f"❌ Error: {e}")
+            self.log_console(f"❌ Error: {e}\n")
             messagebox.showerror("Error", f"Error al lanzar LabelImg:\n{str(e)}")
     
     def update_annotation_stats(self):
