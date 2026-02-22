@@ -96,12 +96,26 @@ class YOLOTrainer:
         
         # Dividir en train/val/test
         random.shuffle(xml_files)
-        n_train = int(len(xml_files) * train_split)
-        n_val = int(len(xml_files) * val_split)
+        total_files = len(xml_files)
         
-        train_files = xml_files[:n_train]
-        val_files = xml_files[n_train:n_train + n_val]
-        test_files = xml_files[n_train + n_val:]
+        # Ajustar splits para datasets pequeños
+        if total_files <= 10:
+            # Para datasets muy pequeños, asegurar al menos 1 imagen en val
+            n_val = max(1, int(total_files * 0.2))  # Al menos 1 para validación
+            n_test = max(0, int(total_files * 0.1))  # Puede ser 0 si es muy pequeño
+            n_train = total_files - n_val - n_test
+            
+            train_files = xml_files[:n_train]
+            val_files = xml_files[n_train:n_train + n_val]
+            test_files = xml_files[n_train + n_val:] if n_test > 0 else []
+        else:
+            # División normal para datasets más grandes
+            n_train = int(total_files * train_split)
+            n_val = int(total_files * val_split)
+            
+            train_files = xml_files[:n_train]
+            val_files = xml_files[n_train:n_train + n_val]
+            test_files = xml_files[n_train + n_val:]
         
         print(f"   Train: {len(train_files)}, Val: {len(val_files)}, Test: {len(test_files)}")
         
@@ -216,17 +230,25 @@ class YOLOTrainer:
         """
         data_yaml_path = self.output_dir / 'data.yaml'
         
-        data_config = {
-            'path': str(self.dataset_dir.absolute()),
-            'train': 'train/images',
-            'val': 'val/images',
-            'test': 'test/images',
-            'nc': len(self.CLASS_NAMES),
-            'names': self.CLASS_NAMES
-        }
+        # Convertir rutas de Windows a forward slashes para compatibilidad YAML
+        dataset_path = str(self.dataset_dir.absolute()).replace('\\', '/')
         
+        # Crear YAML manualmente en el orden correcto que YOLO espera
+        yaml_content = f"""path: {dataset_path}
+train: train/images
+val: val/images
+test: test/images
+
+nc: {len(self.CLASS_NAMES)}
+names:
+"""
+        # Agregar nombres de clases con formato de lista YAML
+        for class_name in self.CLASS_NAMES:
+            yaml_content += f"  - {class_name}\n"
+        
+        # Escribir archivo
         with open(data_yaml_path, 'w', encoding='utf-8') as f:
-            yaml.dump(data_config, f, default_flow_style=False, allow_unicode=True)
+            f.write(yaml_content)
         
         print(f"   Archivo data.yaml creado: {data_yaml_path}")
         
@@ -236,9 +258,9 @@ class YOLOTrainer:
                    data_yaml: str,
                    model_size: str = 'n',
                    epochs: int = 100,
-                   imgsz: int = 640,
-                   batch: int = 16,
-                   device: str = '0',
+                   imgsz: int = 320,
+                   batch: int = 2,
+                   device: str = 'cpu',
                    patience: int = 50,
                    project_name: str = 'microplasticos',
                    name: str = 'yolov8') -> str:
@@ -268,7 +290,7 @@ class YOLOTrainer:
         # Cargar modelo base
         model = YOLO(f'yolov8{model_size}.pt')
         
-        # Entrenar
+        # Entrenar con configuración optimizada para poca memoria
         results = model.train(
             data=data_yaml,
             epochs=epochs,
@@ -282,7 +304,9 @@ class YOLOTrainer:
             verbose=True,
             save=True,
             plots=True,
-            val=True
+            val=True,
+            workers=1,
+            cache=False
         )
         
         # Ruta al mejor modelo

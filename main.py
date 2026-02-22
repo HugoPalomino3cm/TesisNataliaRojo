@@ -46,9 +46,10 @@ class MicroplasticAnalysisGUI:
         
         # Variables para YOLOv8
         self.yolo_model_path = tk.StringVar(value="")
-        self.yolo_epochs = tk.IntVar(value=100)
-        self.yolo_batch = tk.IntVar(value=16)
+        self.yolo_epochs = tk.IntVar(value=30)
+        self.yolo_batch = tk.IntVar(value=2)
         self.yolo_model_size = tk.StringVar(value='n')
+        self.yolo_imgsz = tk.IntVar(value=320)
         
         # Inicializar anotador de imágenes
         self.annotator = ImageAnnotator(RAW_IMAGES_DIR)
@@ -643,7 +644,14 @@ class MicroplasticAnalysisGUI:
         batch_frame.pack(fill=tk.X, pady=5)
         ttk.Label(batch_frame, text="Batch (imágenes por lote):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
         ttk.Entry(batch_frame, textvariable=self.yolo_batch, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Label(batch_frame, text="(16=recomendado | 8=GPU pequeña | 32=GPU grande)", foreground="gray").pack(side=tk.LEFT)
+        ttk.Label(batch_frame, text="(2=poca RAM | 4=normal | 8-16=mucha RAM) ⚠️ Usar 2 para evitar errores", foreground="gray").pack(side=tk.LEFT)
+        
+        # Tamaño de imagen
+        imgsz_frame = ttk.Frame(train_frame)
+        imgsz_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(imgsz_frame, text="Tamaño imagen (píxeles):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(imgsz_frame, textvariable=self.yolo_imgsz, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Label(imgsz_frame, text="(320=rápido/poca RAM | 416=balance | 640=lento/preciso)", foreground="gray").pack(side=tk.LEFT)
         
         # Botones de entrenamiento
         btn_frame = ttk.Frame(train_frame)
@@ -791,7 +799,8 @@ class MicroplasticAnalysisGUI:
                 model_size=self.yolo_model_size.get(),
                 epochs=self.yolo_epochs.get(),
                 batch=self.yolo_batch.get(),
-                device='0'  # GPU si está disponible
+                imgsz=self.yolo_imgsz.get(),
+                device='cpu'  # Usar CPU (no hay GPU disponible)
             )
             
             self.log_yolo("\n" + "="*60 + "\n")

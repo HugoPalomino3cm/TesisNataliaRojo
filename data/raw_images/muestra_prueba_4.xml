@@ -1,0 +1,26 @@
+<annotation>
+	<folder>raw_images</folder>
+	<filename>muestra_prueba_4.jpg</filename>
+	<path>c:\Users\xg645\Downloads\TesisNataliaRojo\data\raw_images\muestra_prueba_4.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>1000</width>
+		<height>800</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>fragmento</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>322</xmin>
+			<ymin>601</ymin>
+			<xmax>366</xmax>
+			<ymax>646</ymax>
+		</bndbox>
+	</object>
+</annotation>

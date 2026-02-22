@@ -56,9 +56,9 @@ def main():
         data_yaml=data_yaml,
         model_size='n',      # nano (más rápido) - usa 's', 'm', 'l', 'x' para más precisión
         epochs=100,          # Puedes aumentar a 200-300 para mejor resultado
-        batch=16,            # Ajusta según tu GPU (8, 16, 32)
-        imgsz=640,           # Tamaño de imagen
-        device='0',          # '0' para GPU, 'cpu' para CPU
+        batch=2,             # Reducido para ahorrar memoria (antes: 16)
+        imgsz=416,           # Reducido para ahorrar memoria (antes: 640)
+        device='cpu',        # Usar CPU para evitar errores de VRAM (cambia a '0' si tienes GPU potente)
         patience=50          # Early stopping si no mejora en 50 épocas
     )
     

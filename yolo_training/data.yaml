@@ -1,0 +1,13 @@
+path: c:/Users/xg645/Downloads/TesisNataliaRojo/yolo_training/dataset
+train: train/images
+val: val/images
+test: test/images
+
+nc: 6
+names:
+  - fibra
+  - fragmento
+  - pelicula
+  - esfera
+  - microplastico_irregular
+  - aglomerado
