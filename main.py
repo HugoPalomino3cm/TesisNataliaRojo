@@ -23,8 +23,8 @@ from src.statistical_analysis import StatisticalAnalyzer
 from src.visualization import DataVisualizer
 from src.image_annotation import ImageAnnotator, launch_labelimg_standalone
 from config.config import (
-    RAW_IMAGES_DIR, PROCESSED_IMAGES_DIR, GRAPHS_DIR, 
-    REPORTS_DIR, IMAGE_PARAMS
+    RAW_IMAGES_DIR, ANALYSIS_IMAGES_DIR, PROCESSED_IMAGES_DIR, 
+    ANNOTATIONS_DIR, GRAPHS_DIR, REPORTS_DIR, IMAGE_PARAMS
 )
 
 
@@ -246,7 +246,7 @@ class MicroplasticAnalysisGUI:
         # Botón para usar directorio por defecto
         btn_default = ttk.Button(
             img_frame,
-            text="📁 Cargar Imágenes desde Carpeta por Defecto (data/raw_images)",
+            text="📁 Cargar Imágenes para Analizar (data/analysis_images)",
             command=self.load_default_images
         )
         btn_default.pack(pady=5)
@@ -700,6 +700,21 @@ class MicroplasticAnalysisGUI:
         console_frame = ttk.LabelFrame(parent, text="📋 Log de Entrenamiento", padding=10)
         console_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        # Barra de progreso visual
+        progress_frame = ttk.Frame(console_frame)
+        progress_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(progress_frame, text="Progreso:", font=("Arial", 9, "bold")).pack(side=tk.LEFT, padx=5)
+        self.yolo_progress = ttk.Progressbar(
+            progress_frame,
+            mode='indeterminate',
+            length=300
+        )
+        self.yolo_progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        self.yolo_progress_label = ttk.Label(progress_frame, text="Esperando...", font=("Arial", 9))
+        self.yolo_progress_label.pack(side=tk.LEFT, padx=5)
+        
         self.yolo_console = scrolledtext.ScrolledText(
             console_frame,
             height=12,
@@ -773,17 +788,22 @@ class MicroplasticAnalysisGUI:
     def run_yolo_training(self):
         """Ejecuta el entrenamiento YOLO."""
         try:
+            # Iniciar animación de progreso
+            self.yolo_progress.start(10)
+            self.yolo_progress_label.config(text="Inicializando...")
+            
             from src.train_yolo import YOLOTrainer
             
             self.log_yolo("📦 Inicializando entrenador YOLO...\n")
             
             trainer = YOLOTrainer(
-                annotations_dir=str(RAW_IMAGES_DIR),
+                annotations_dir=str(ANNOTATIONS_DIR),
                 images_dir=str(RAW_IMAGES_DIR),
                 output_dir="yolo_training"
             )
             
             self.log_yolo("✅ Entrenador inicializado\n\n")
+            self.yolo_progress_label.config(text="Convirtiendo dataset...")
             self.log_yolo("📋 Convirtiendo anotaciones VOC a formato YOLO...\n")
             
             # Convertir dataset
@@ -791,10 +811,13 @@ class MicroplasticAnalysisGUI:
             self.log_yolo(f"✅ Dataset convertido: {data_yaml}\n\n")
             
             # Entrenar
+            self.yolo_progress_label.config(text="Entrenando modelo...")
             self.log_yolo("🎯 Iniciando entrenamiento...\n")
-            self.log_yolo("   (Esto puede tomar mucho tiempo)\n\n")
+            self.log_yolo("   (Esto puede tomar mucho tiempo)\n")
+            self.log_yolo(f"   Épocas: {self.yolo_epochs.get()}\n")
+            self.log_yolo(f"   Tamaño: {self.yolo_imgsz.get()}px\n\n")
             
-            best_model = trainer.train_model(
+            best_model, training_number = trainer.train_model(
                 data_yaml=data_yaml,
                 model_size=self.yolo_model_size.get(),
                 epochs=self.yolo_epochs.get(),
@@ -803,8 +826,9 @@ class MicroplasticAnalysisGUI:
                 device='cpu'  # Usar CPU (no hay GPU disponible)
             )
             
+            self.yolo_progress_label.config(text="Evaluando modelo...")
             self.log_yolo("\n" + "="*60 + "\n")
-            self.log_yolo("🎉 ENTRENAMIENTO COMPLETADO\n")
+            self.log_yolo(f"🎉 ENTRENAMIENTO #{training_number} COMPLETADO\n")
             self.log_yolo("="*60 + "\n\n")
             self.log_yolo(f"📦 Modelo guardado en:\n   {best_model}\n\n")
             
@@ -815,22 +839,28 @@ class MicroplasticAnalysisGUI:
             self.log_yolo("📊 Evaluando modelo...\n")
             trainer.evaluate_model(best_model, data_yaml)
             
+            self.yolo_progress_label.config(text="✅ Completado")
+            self.yolo_progress.stop()
             self.log_yolo("\n✅ Proceso completado exitosamente\n")
             self.log_yolo("💡 Ahora puedes usar este modelo en la pestaña de Análisis\n")
             
             messagebox.showinfo(
                 "Entrenamiento Completado",
-                f"El modelo ha sido entrenado exitosamente.\n\n"
+                f"Entrenamiento #{training_number} completado exitosamente.\n\n"
                 f"Modelo guardado en:\n{best_model}\n\n"
                 f"Ve a la pestaña de Análisis y activa 'Usar YOLOv8'"
             )
             
         except ImportError as e:
+            self.yolo_progress.stop()
+            self.yolo_progress_label.config(text="❌ Error")
             self.log_yolo(f"\n❌ ERROR: ultralytics no está instalado\n")
             self.log_yolo(f"   Ejecuta: pip install ultralytics torch torchvision\n")
             messagebox.showerror("Error", f"Falta ultralytics:\n{str(e)}\n\nEjecuta:\npip install ultralytics")
             
         except Exception as e:
+            self.yolo_progress.stop()
+            self.yolo_progress_label.config(text="❌ Error")
             self.log_yolo(f"\n❌ ERROR durante el entrenamiento:\n{str(e)}\n")
             messagebox.showerror("Error", f"Error durante el entrenamiento:\n{str(e)}")
             
@@ -1235,13 +1265,16 @@ class MicroplasticAnalysisGUI:
                 self.log_console(f"[!] No se pudieron cargar las imágenes\n")
     
     def load_default_images(self):
-        """Carga imágenes de la carpeta por defecto y abre LabelImg."""
+        """Carga imágenes de la carpeta de análisis (NO para entrenamiento)."""
+        # Crear carpeta si no existe
+        ANALYSIS_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        
         image_extensions = ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']
         temp_files = []
         
         for ext in image_extensions:
-            temp_files.extend(RAW_IMAGES_DIR.glob(f'*{ext}'))
-            temp_files.extend(RAW_IMAGES_DIR.glob(f'*{ext.upper()}'))
+            temp_files.extend(ANALYSIS_IMAGES_DIR.glob(f'*{ext}'))
+            temp_files.extend(ANALYSIS_IMAGES_DIR.glob(f'*{ext.upper()}'))
         
         # Filtrar archivos válidos y eliminar duplicados
         unique_files = list(set([str(f) for f in temp_files if f.exists() and f.is_file()]))
@@ -1250,24 +1283,20 @@ class MicroplasticAnalysisGUI:
         self.update_image_list()
         
         if self.image_files:
-            self.log_console(f"[OK] Cargadas {len(self.image_files)} imágenes de {RAW_IMAGES_DIR}\n")
-            
-            # Preguntar si desea abrir LabelImg
-            respuesta = messagebox.askyesno(
-                "Anotar Imágenes",
-                f"Se han cargado {len(self.image_files)} imagen(es) desde la carpeta por defecto.\n\n"
-                "¿Desea abrir LabelImg para anotarlas ahora?",
-                icon='question'
+            self.log_console(f"[OK] Cargadas {len(self.image_files)} imágenes de análisis\n")
+            messagebox.showinfo(
+                "Imágenes Cargadas",
+                f"Se han cargado {len(self.image_files)} imagen(es) para analizar.\n\n"
+                f"Ve a la pestaña 'Análisis' para procesarlas con el modelo."
             )
-            
-            if respuesta:
-                self.log_console("[→] Abriendo LabelImg para anotar imágenes...\n")
-                # Cambiar a la pestaña de anotación
-                self.notebook.select(1)  # Pestaña de anotación (índice 1)
-                # Abrir LabelImg
-                self.root.after(500, self.launch_labelimg)
         else:
-            self.log_console(f"[!] No se encontraron imágenes en {RAW_IMAGES_DIR}\n")
+            self.log_console(f"[!] No se encontraron imágenes en {ANALYSIS_IMAGES_DIR}\n")
+            messagebox.showwarning(
+                "Sin imágenes",
+                f"No hay imágenes en la carpeta de análisis.\n\n"
+                f"Copia las imágenes que quieras analizar a:\n{ANALYSIS_IMAGES_DIR}\n\n"
+                f"Nota: Las imágenes de entrenamiento están en data/raw_images"
+            )
             messagebox.showwarning(
                 "Sin imágenes",
                 f"No se encontraron imágenes en:\n{RAW_IMAGES_DIR}\n\n"
@@ -1408,70 +1437,92 @@ class MicroplasticAnalysisGUI:
                 
                 def analyze_single_sample(self, image_path, sample_id):
                     """Analiza una única muestra."""
-                    self.message_queue.put(f"\n{'='*60}\n")
-                    self.message_queue.put(f"Analizando muestra: {sample_id}\n")
-                    self.message_queue.put(f"{'='*60}\n")
-                    
-                    # 1. Procesar imagen
-                    self.message_queue.put("1. Procesando imagen...\n")
-                    particles, labeled = self.processor.process_image(
-                        image_path,
-                        save_processed=True,
-                        output_dir=str(PROCESSED_IMAGES_DIR)
-                    )
-                    self.message_queue.put(f"   ✓ Detectadas {len(particles)} partículas\n")
-                    
-                    # 2. Convertir a DataFrame
-                    self.message_queue.put("2. Analizando datos estadísticos...\n")
-                    df = self.analyzer.particles_to_dataframe(particles, sample_id)
-                    
-                    # 3. Generar visualizaciones
-                    self.message_queue.put("3. Generando visualizaciones...\n")
-                    
-                    # Gráfico de distribución por TIPO de microplástico
-                    if 'class_name' in df.columns:
-                        class_plot_path = GRAPHS_DIR / f"{sample_id}_class_distribution.png"
-                        self.visualizer.plot_class_distribution(df, sample_id, str(class_plot_path))
-                        self.message_queue.put(f"   ✓ Guardado: {class_plot_path.name}\n")
-                    
-                    size_plot_path = GRAPHS_DIR / f"{sample_id}_size_distribution.png"
-                    self.visualizer.plot_size_distribution(df, sample_id, str(size_plot_path))
-                    self.message_queue.put(f"   ✓ Guardado: {size_plot_path.name}\n")
-                    
-                    shape_plot_path = GRAPHS_DIR / f"{sample_id}_shape_distribution.png"
-                    self.visualizer.plot_shape_distribution(df, sample_id, str(shape_plot_path))
-                    self.message_queue.put(f"   ✓ Guardado: {shape_plot_path.name}\n")
-                    
-                    dashboard_path = GRAPHS_DIR / f"{sample_id}_dashboard.png"
-                    self.visualizer.create_summary_dashboard(df, sample_id, str(dashboard_path))
-                    self.message_queue.put(f"   ✓ Guardado: {dashboard_path.name}\n")
-                    
-                    freq_path = GRAPHS_DIR / f"{sample_id}_frequency_curve.png"
-                    self.visualizer.plot_size_frequency_curve(df, sample_id, str(freq_path))
-                    self.message_queue.put(f"   ✓ Guardado: {freq_path.name}\n")
-                    
-                    corr_path = GRAPHS_DIR / f"{sample_id}_correlation_matrix.png"
-                    self.visualizer.plot_correlation_matrix(df, str(corr_path))
-                    self.message_queue.put(f"   ✓ Guardado: {corr_path.name}\n")
-                    
-                    # 4. Generar reporte textual
-                    self.message_queue.put("4. Generando reporte...\n")
-                    report = self.analyzer.generate_summary_report(df, sample_id)
-                    report_path = REPORTS_DIR / f"{sample_id}_report.txt"
-                    with open(report_path, 'w', encoding='utf-8') as f:
-                        f.write(report)
-                    self.message_queue.put(f"   ✓ Guardado: {report_path.name}\n")
-                    
-                    # 5. Exportar datos a Excel
-                    self.message_queue.put("5. Exportando datos...\n")
-                    excel_path = REPORTS_DIR / f"{sample_id}_data.xlsx"
-                    df.to_excel(excel_path, index=False)
-                    self.message_queue.put(f"   ✓ Guardado: {excel_path.name}\n")
-                    
-                    self.results[sample_id] = df
-                    self.message_queue.put(f"\n✓ Análisis de {sample_id} completado exitosamente\n")
-                    
-                    return df
+                    try:
+                        self.message_queue.put(f"\n{'='*60}\n")
+                        self.message_queue.put(f"Analizando muestra: {sample_id}\n")
+                        self.message_queue.put(f"{'='*60}\n")
+                        
+                        # 1. Procesar imagen
+                        self.message_queue.put("1. Procesando imagen...\n")
+                        particles, labeled = self.processor.process_image(
+                            image_path,
+                            save_processed=True,
+                            output_dir=str(PROCESSED_IMAGES_DIR)
+                        )
+                        self.message_queue.put(f"   ✓ Detectadas {len(particles)} partículas\n")
+                        
+                        # Verificar si se detectaron partículas
+                        if not particles or len(particles) == 0:
+                            self.message_queue.put("\n⚠️  No se detectaron partículas en esta imagen\n")
+                            self.message_queue.put("   El modelo puede necesitar más entrenamiento\n")
+                            self.message_queue.put("   o la imagen no contiene objetos detectables\n\n")
+                            return None
+                        
+                        # 2. Convertir a DataFrame
+                        self.message_queue.put("2. Analizando datos estadísticos...\n")
+                        df = self.analyzer.particles_to_dataframe(particles, sample_id)
+                        
+                        # Verificar que el dataframe tenga datos válidos
+                        if df.empty or len(df) == 0:
+                            self.message_queue.put("\n⚠️  No se pudieron procesar las partículas detectadas\n\n")
+                            return None
+                        
+                        # 3. Generar visualizaciones
+                        self.message_queue.put("3. Generando visualizaciones...\n")
+                        
+                        # Gráfico de distribución por TIPO de microplástico
+                        if 'class_name' in df.columns and not df['class_name'].isna().all():
+                            class_plot_path = GRAPHS_DIR / f"{sample_id}_class_distribution.png"
+                            self.visualizer.plot_class_distribution(df, sample_id, str(class_plot_path))
+                            self.message_queue.put(f"   ✓ Guardado: {class_plot_path.name}\n")
+                        
+                        if 'equivalent_diameter_um' in df.columns:
+                            size_plot_path = GRAPHS_DIR / f"{sample_id}_size_distribution.png"
+                            self.visualizer.plot_size_distribution(df, sample_id, str(size_plot_path))
+                            self.message_queue.put(f"   ✓ Guardado: {size_plot_path.name}\n")
+                        
+                        if 'aspect_ratio' in df.columns:
+                            shape_plot_path = GRAPHS_DIR / f"{sample_id}_shape_distribution.png"
+                            self.visualizer.plot_shape_distribution(df, sample_id, str(shape_plot_path))
+                            self.message_queue.put(f"   ✓ Guardado: {shape_plot_path.name}\n")
+                        
+                        dashboard_path = GRAPHS_DIR / f"{sample_id}_dashboard.png"
+                        self.visualizer.create_summary_dashboard(df, sample_id, str(dashboard_path))
+                        self.message_queue.put(f"   ✓ Guardado: {dashboard_path.name}\n")
+                        
+                        freq_path = GRAPHS_DIR / f"{sample_id}_frequency_curve.png"
+                        self.visualizer.plot_size_frequency_curve(df, sample_id, str(freq_path))
+                        self.message_queue.put(f"   ✓ Guardado: {freq_path.name}\n")
+                        
+                        corr_path = GRAPHS_DIR / f"{sample_id}_correlation_matrix.png"
+                        self.visualizer.plot_correlation_matrix(df, str(corr_path))
+                        self.message_queue.put(f"   ✓ Guardado: {corr_path.name}\n")
+                        
+                        # 4. Generar reporte textual
+                        self.message_queue.put("4. Generando reporte...\n")
+                        report = self.analyzer.generate_summary_report(df, sample_id)
+                        report_path = REPORTS_DIR / f"{sample_id}_report.txt"
+                        with open(report_path, 'w', encoding='utf-8') as f:
+                            f.write(report)
+                        self.message_queue.put(f"   ✓ Guardado: {report_path.name}\n")
+                        
+                        # 5. Exportar datos a Excel
+                        self.message_queue.put("5. Exportando datos...\n")
+                        excel_path = REPORTS_DIR / f"{sample_id}_data.xlsx"
+                        df.to_excel(excel_path, index=False)
+                        self.message_queue.put(f"   ✓ Guardado: {excel_path.name}\n")
+                        
+                        self.results[sample_id] = df
+                        self.message_queue.put(f"\n✓ Análisis de {sample_id} completado exitosamente\n")
+                        
+                        return df
+                        
+                    except Exception as e:
+                        self.message_queue.put(f"\n❌ ERROR al analizar {sample_id}:\n")
+                        self.message_queue.put(f"   {str(e)}\n\n")
+                        import traceback
+                        self.message_queue.put(f"Detalles: {traceback.format_exc()}\n")
+                        return None
                 
                 def analyze_multiple_samples(self, image_paths):
                     for sample_id, image_path in image_paths.items():
@@ -1521,12 +1572,11 @@ class MicroplasticAnalysisGUI:
                         stats = {
                             'Muestra': sample_id,
                             'N_partículas': len(df),
-                            'Área_media_μm2': df['area_um2'].mean(),
-                            'Área_std_μm2': df['area_um2'].std(),
-                            'Diámetro_medio_μm': df['equivalent_diameter_um'].mean(),
-                            'Diámetro_std_μm': df['equivalent_diameter_um'].std(),
-                            'Relación_aspecto_media': df['aspect_ratio'].mean(),
-                            'Excentricidad_media': df['eccentricity'].mean(),
+                            'Área_media_μm2': df['area_um2'].mean() if 'area_um2' in df.columns else 0,
+                            'Área_std_μm2': df['area_um2'].std() if 'area_um2' in df.columns else 0,
+                            'Diámetro_medio_μm': df['equivalent_diameter_um'].mean() if 'equivalent_diameter_um' in df.columns else 0,
+                            'Diámetro_std_μm': df['equivalent_diameter_um'].std() if 'equivalent_diameter_um' in df.columns else 0,
+                            'Relación_aspecto_media': df['aspect_ratio'].mean() if 'aspect_ratio' in df.columns else 0,
                         }
                         summary_stats.append(stats)
                     

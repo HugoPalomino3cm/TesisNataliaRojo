@@ -5,5 +5,5 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 strPath = fso.GetParentFolderName(WScript.ScriptFullName)
 WshShell.CurrentDirectory = strPath
 
-' Ejecutar el script Python
-WshShell.Run "python launch_labelimg.py", 1, False
+' Ejecutar con pythonw (sin ventana de consola), 0 = oculto, False = no esperar
+WshShell.Run "venv_py311\Scripts\pythonw.exe launch_labelimg.py", 0, False

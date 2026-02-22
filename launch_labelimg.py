@@ -18,7 +18,7 @@ def main():
     classes_file = annotations_dir / "predefined_classes.txt"
     
     # Python del entorno virtual
-    venv_python = script_dir / "venv_py311" / "Scripts" / "python.exe"
+    venv_python = script_dir / "venv_py311" / "Scripts" / "pythonw.exe"
 
     # Crear directorios
     annotations_dir.mkdir(parents=True, exist_ok=True)
@@ -42,40 +42,40 @@ def main():
         input("Presiona Enter...")
         sys.exit(1)
 
-    print("=" * 70)
-    print("  LABELIMG - Python 3.11")
-    print("=" * 70)
-    print(f"📁 Imágenes:    {len(image_files)} archivos")
-    print(f"📝 Anotaciones: {annotations_dir}")
-    print("=" * 70)
-    print()
-
-    # Usar Python 3.11 del venv
+    # Usar Python 3.11 del venv (pythonw = sin consola)
     if venv_python.exists():
         python_exe = str(venv_python)
-        print(f"✅ Usando Python 3.11: {python_exe}")
     else:
         print("⚠️  Entorno virtual no encontrado, ejecuta:")
         print("   abrir_labelimg.bat")
         input("\nPresiona Enter...")
         sys.exit(1)
 
-    print("⏳ Iniciando labelImg...\n")
+    # Ruta al script de labelImg clonado
+    labelimg_script = script_dir / "labelImg_tool" / "labelImg.py"
+    
+    if not labelimg_script.exists():
+        print(f"❌ No se encontró labelImg en: {labelimg_script}")
+        print("⚠️  Ejecuta: git clone https://github.com/heartexlabs/labelImg.git labelImg_tool")
+        input("\nPresiona Enter...")
+        sys.exit(1)
 
     try:
-        result = subprocess.call([
+        # Ejecutar labelImg desde el repositorio clonado (sin consola)
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = subprocess.SW_HIDE
+        
+        process = subprocess.Popen([
             python_exe,
-            '-m',
-            'labelImg.labelImg',
+            str(labelimg_script),
             str(images_dir),
             str(classes_file),
             str(annotations_dir)
-        ])
+        ], startupinfo=si if os.name == 'nt' else None)
         
-        if result == 0:
-            print("\n✅ Cerrado correctamente")
-        else:
-            print(f"\n⚠️  Código: {result}")
+        # No esperar a que termine
+        # process.wait()
         
     except Exception as e:
         print(f"\n❌ ERROR: {e}")

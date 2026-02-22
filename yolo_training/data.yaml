@@ -1,7 +1,6 @@
-path: c:/Users/xg645/Downloads/TesisNataliaRojo/yolo_training/dataset
+path: d:/repositorios/TesisNataliaRojo/yolo_training/dataset
 train: train/images
 val: val/images
-test: test/images
 
 nc: 6
 names:

@@ -25,7 +25,8 @@ class ImageAnnotator:
             annotations_dir (str): Directorio donde guardar las anotaciones (opcional)
         """
         self.images_dir = Path(images_dir)
-        self.annotations_dir = Path(annotations_dir) if annotations_dir else self.images_dir.parent / "annotations"
+        # Por defecto, las anotaciones se guardan en el mismo directorio que las imágenes
+        self.annotations_dir = Path(annotations_dir) if annotations_dir else Path(images_dir)
         
         # Crear directorio de anotaciones si no existe
         self.annotations_dir.mkdir(parents=True, exist_ok=True)
@@ -82,32 +83,62 @@ class ImageAnnotator:
             print(f"  - Directorio de anotaciones: {self.annotations_dir}")
             print(f"  - Clases predefinidas: {self.predefined_classes_file}")
             
-            # Usar el script abrir_labelimg.bat
+            # Intentar usar labelImg directamente desde el entorno virtual
             try:
-                bat_path = Path(__file__).parent.parent / "abrir_labelimg.bat"
+                # Buscar el ejecutable de Python del entorno virtual (pythonw = sin consola)
+                venv_pythonw = Path(__file__).parent.parent / "venv_py311" / "Scripts" / "pythonw.exe"
+                labelimg_script = Path(__file__).parent.parent / "labelImg_tool" / "labelImg.py"
                 
-                if bat_path.exists():
-                    # Ejecutar el archivo batch en un proceso separado
-                    process = subprocess.Popen(
-                        [str(bat_path)],
-                        creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0,
-                        cwd=str(bat_path.parent),
-                        shell=True
-                    )
-                    
-                    print("✓ LabelImg iniciando desde repositorio clonado...")
-                    print("  Revisa si se abrió una nueva ventana")
-                    return True
-                else:
-                    raise FileNotFoundError(f"No se encontró {bat_path}")
+                if not venv_pythonw.exists():
+                    raise FileNotFoundError("Entorno virtual no encontrado")
+                
+                if not labelimg_script.exists():
+                    raise FileNotFoundError("labelImg.py no encontrado en labelImg_tool/")
+                
+                # Ejecutar labelImg con pythonw (sin consola)
+                cmd = [
+                    str(venv_pythonw),
+                    str(labelimg_script),
+                    str(self.images_dir),
+                    str(self.predefined_classes_file),
+                    str(self.annotations_dir)
+                ]
+                
+                print(f"Ejecutando: {' '.join(cmd)}")
+                
+                # Iniciar el proceso sin consola
+                import subprocess
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = subprocess.SW_HIDE
+                
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=str(labelimg_script.parent),
+                    startupinfo=si if os.name == 'nt' else None
+                )
+                
+                print("✓ LabelImg iniciado exitosamente")
+                print("  Si no se abre, usa el archivo: abrir_labelimg.vbs")
+                return True
                     
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"Error al iniciar directamente: {e}")
+                # Intentar con el archivo VBS
+                try:
+                    vbs_path = Path(__file__).parent.parent / "abrir_labelimg.vbs"
+                    if vbs_path.exists():
+                        subprocess.Popen(["wscript", str(vbs_path)], shell=True)
+                        print("✓ LabelImg iniciando con VBScript...")
+                        return True
+                except:
+                    pass
+                
                 messagebox.showwarning(
-                    "Usa el archivo batch",
+                    "Método alternativo",
                     f"No se pudo abrir desde aquí.\n\n"
                     f"SOLUCIÓN:\n"
-                    f"Haz doble clic en: abrir_labelimg.bat\n\n"
+                    f"Haz doble clic en: abrir_labelimg.vbs\n\n"
                     f"(Está en la carpeta principal del proyecto)"
                 )
                 return False
@@ -118,10 +149,8 @@ class ImageAnnotator:
                 "Error al abrir LabelImg",
                 f"No se pudo abrir LabelImg desde el botón.\n\n"
                 f"Error: {error_msg}\n\n"
-                f"SOLUCIÓN: Use el script batch:\n"
-                f"Ejecute en una terminal: abrir_labelimg.bat\n\n"
-                f"O ejecute manualmente:\n"
-                f'labelImg "{self.images_dir}"'
+                f"SOLUCIÓN: Use el script VBS:\n"
+                f"Haga doble clic en: abrir_labelimg.vbs"
             )
             print(f"Error detallado: {e}")
             import traceback

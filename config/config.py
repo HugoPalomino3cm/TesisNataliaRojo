@@ -8,8 +8,11 @@ from pathlib import Path
 # Rutas del proyecto
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
-RAW_IMAGES_DIR = DATA_DIR / "raw_images"
+RAW_IMAGES_DIR = DATA_DIR / "raw_images"  # Para entrenamiento (con XML)
+ANALYSIS_IMAGES_DIR = DATA_DIR / "analysis_images"  # Para análisis (sin XML)
 PROCESSED_IMAGES_DIR = DATA_DIR / "processed_images"
+# LabelImg guarda los XML junto a las imágenes por defecto
+ANNOTATIONS_DIR = RAW_IMAGES_DIR
 RESULTS_DIR = PROJECT_ROOT / "results"
 GRAPHS_DIR = RESULTS_DIR / "graphs"
 REPORTS_DIR = RESULTS_DIR / "reports"

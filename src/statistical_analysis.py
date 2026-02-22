@@ -35,20 +35,36 @@ class StatisticalAnalyzer:
         Returns:
             DataFrame con información de partículas.
         """
+        # Validar que haya partículas
+        if not particles or len(particles) == 0:
+            # Retornar un dataframe vacío con las columnas esperadas
+            return pd.DataFrame(columns=[
+                'sample_id', 'label', 'class_name', 'area_um2', 'perimeter_um',
+                'equivalent_diameter_um', 'aspect_ratio', 'circularity',
+                'width_um', 'height_um', 'size_category', 'shape_category'
+            ])
+        
         df = pd.DataFrame(particles)
         
         if sample_id:
             df['sample_id'] = sample_id
         
-        # Clasificar por tamaño
-        df['size_category'] = df['equivalent_diameter_um'].apply(
-            self._classify_by_size
-        )
+        # Validar que existan las columnas necesarias antes de clasificar
+        if 'equivalent_diameter_um' in df.columns:
+            # Clasificar por tamaño
+            df['size_category'] = df['equivalent_diameter_um'].apply(
+                self._classify_by_size
+            )
+        else:
+            df['size_category'] = 'indefinido'
         
-        # Clasificar por forma
-        df['shape_category'] = df['aspect_ratio'].apply(
-            self._classify_by_aspect_ratio
-        )
+        if 'aspect_ratio' in df.columns:
+            # Clasificar por forma
+            df['shape_category'] = df['aspect_ratio'].apply(
+                self._classify_by_aspect_ratio
+            )
+        else:
+            df['shape_category'] = 'indefinido'
         
         return df
     

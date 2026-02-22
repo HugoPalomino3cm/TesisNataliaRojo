@@ -63,6 +63,35 @@ class YOLOTrainer:
         self.dataset_dir.mkdir(parents=True, exist_ok=True)
         self.models_dir.mkdir(parents=True, exist_ok=True)
         
+        # Almacenar información sobre splits
+        self.has_test_split = False
+    
+    def _get_next_training_number(self, project_name: str) -> int:
+        """
+        Obtiene el siguiente número de entrenamiento disponible.
+        
+        Args:
+            project_name: Nombre del proyecto.
+            
+        Returns:
+            Siguiente número de entrenamiento.
+        """
+        project_dir = self.models_dir / project_name
+        if not project_dir.exists():
+            return 1
+        
+        # Buscar carpetas que sigan el patrón yolov8_N
+        import re
+        max_num = 0
+        for folder in project_dir.iterdir():
+            if folder.is_dir():
+                match = re.match(r'yolov8_(\d+)', folder.name)
+                if match:
+                    num = int(match.group(1))
+                    max_num = max(max_num, num)
+        
+        return max_num + 1
+    
     def convert_voc_to_yolo(self,
                            train_split: float = 0.8,
                            val_split: float = 0.15) -> str:
@@ -118,6 +147,9 @@ class YOLOTrainer:
             test_files = xml_files[n_train + n_val:]
         
         print(f"   Train: {len(train_files)}, Val: {len(val_files)}, Test: {len(test_files)}")
+        
+        # Marcar si hay imágenes de test
+        self.has_test_split = len(test_files) > 0
         
         # Convertir cada split
         for split_name, split_files in [
@@ -237,11 +269,14 @@ class YOLOTrainer:
         yaml_content = f"""path: {dataset_path}
 train: train/images
 val: val/images
-test: test/images
-
-nc: {len(self.CLASS_NAMES)}
-names:
 """
+        
+        # Solo incluir test si hay imágenes de test
+        if self.has_test_split:
+            yaml_content += "test: test/images\n"
+        
+        yaml_content += f"\nnc: {len(self.CLASS_NAMES)}\nnames:\n"
+        
         # Agregar nombres de clases con formato de lista YAML
         for class_name in self.CLASS_NAMES:
             yaml_content += f"  - {class_name}\n"
@@ -263,7 +298,7 @@ names:
                    device: str = 'cpu',
                    patience: int = 50,
                    project_name: str = 'microplasticos',
-                   name: str = 'yolov8') -> str:
+                   name: str = None) -> tuple:
         """
         Entrena un modelo YOLOv8.
         
@@ -276,12 +311,17 @@ names:
             device: Dispositivo ('0' para GPU, 'cpu' para CPU).
             patience: Épocas sin mejora antes de early stopping.
             project_name: Nombre del proyecto.
-            name: Nombre del experimento.
+            name: Nombre del experimento (opcional, se auto-genera si es None).
             
         Returns:
-            Ruta al mejor modelo entrenado.
+            Tupla con (ruta al mejor modelo, número de entrenamiento).
         """
-        print(f"\n🚀 Iniciando entrenamiento YOLOv8{model_size}...")
+        # Obtener el siguiente número de entrenamiento
+        training_number = self._get_next_training_number(project_name)
+        if name is None:
+            name = f'yolov8_{training_number}'
+        
+        print(f"\n🚀 Iniciando entrenamiento YOLOv8{model_size} - Entrenamiento #{training_number}")
         print(f"   Épocas: {epochs}")
         print(f"   Tamaño imagen: {imgsz}")
         print(f"   Batch size: {batch}")
@@ -300,7 +340,7 @@ names:
             patience=patience,
             project=str(self.models_dir / project_name),
             name=name,
-            exist_ok=True,
+            exist_ok=False,  # Crear nueva carpeta para cada entrenamiento
             verbose=True,
             save=True,
             plots=True,
@@ -309,13 +349,22 @@ names:
             cache=False
         )
         
-        # Ruta al mejor modelo
-        best_model_path = self.models_dir / project_name / name / 'weights' / 'best.pt'
+        # Obtener el path real del modelo desde el objeto trainer
+        # YOLO guarda el path en model.trainer.save_dir
+        save_dir = Path(model.trainer.save_dir)
+        best_model_path = save_dir / 'weights' / 'best.pt'
         
-        print(f"\n✅ Entrenamiento completado")
+        # Verificar que el archivo existe
+        if not best_model_path.exists():
+            raise FileNotFoundError(
+                f"No se encontró el modelo entrenado en {best_model_path}\n"
+                f"Directorio de guardado: {save_dir}"
+            )
+        
+        print(f"\n✅ Entrenamiento #{training_number} completado")
         print(f"   Mejor modelo: {best_model_path}")
         
-        return str(best_model_path)
+        return str(best_model_path), training_number
     
     def evaluate_model(self, model_path: str, data_yaml: str):
         """
@@ -332,18 +381,21 @@ names:
         # Validar en conjunto de validación
         metrics = model.val(data=data_yaml, split='val')
         
-        # Validar en conjunto de prueba
-        test_metrics = model.val(data=data_yaml, split='test')
-        
         print("\n📈 Métricas de validación:")
         print(f"   mAP50: {metrics.box.map50:.4f}")
         print(f"   mAP50-95: {metrics.box.map:.4f}")
         print(f"   Precisión: {metrics.box.mp:.4f}")
         print(f"   Recall: {metrics.box.mr:.4f}")
         
-        print("\n📈 Métricas de prueba:")
-        print(f"   mAP50: {test_metrics.box.map50:.4f}")
-        print(f"   mAP50-95: {test_metrics.box.map:.4f}")
+        # Validar en conjunto de prueba solo si existe
+        test_metrics = None
+        if self.has_test_split:
+            test_metrics = model.val(data=data_yaml, split='test')
+            print("\n📈 Métricas de prueba:")
+            print(f"   mAP50: {test_metrics.box.map50:.4f}")
+            print(f"   mAP50-95: {test_metrics.box.map:.4f}")
+        else:
+            print("\n⚠️  No hay conjunto de prueba (dataset muy pequeño)")
         
         return metrics, test_metrics
     
@@ -445,7 +497,7 @@ def main():
     data_yaml = trainer.convert_voc_to_yolo()
     
     # Entrenar modelo
-    best_model = trainer.train_model(
+    best_model, training_number = trainer.train_model(
         data_yaml=data_yaml,
         model_size=args.model_size,
         epochs=args.epochs,
@@ -457,7 +509,7 @@ def main():
     # Evaluar modelo
     trainer.evaluate_model(best_model, data_yaml)
     
-    print(f"\n🎉 Entrenamiento completado exitosamente!")
+    print(f"\n🎉 Entrenamiento #{training_number} completado exitosamente!")
     print(f"   Modelo guardado en: {best_model}")
     print(f"\n💡 Para usar el modelo en la aplicación:")
     print(f"   1. Copia el modelo a la carpeta 'models/'")
