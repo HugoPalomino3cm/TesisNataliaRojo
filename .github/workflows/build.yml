@@ -40,33 +40,10 @@ jobs:
         if (Test-Path dist) { Remove-Item -Recurse -Force dist }
       shell: pwsh
     
-    # 5. Compilar el .exe con PyInstaller (optimizado)
+    # 5. Compilar el .exe con PyInstaller usando build.spec
     - name: Compilar aplicación
       run: |
-        pyinstaller --onefile --windowed --name="AnalisisMicroplasticos" `
-          --add-data "config;config" `
-          --add-data "src;src" `
-          --add-data "yolov8n.pt;." `
-          --hidden-import=PIL._tkinter_finder `
-          --hidden-import=sklearn.utils._weight_vector `
-          --hidden-import=cv2 `
-          --hidden-import=numpy `
-          --hidden-import=pandas `
-          --hidden-import=matplotlib `
-          --hidden-import=seaborn `
-          --hidden-import=scipy `
-          --hidden-import=openpyxl `
-          --exclude-module=torch.distributions `
-          --exclude-module=torch.testing `
-          --exclude-module=torchvision.models `
-          --exclude-module=jupyter `
-          --exclude-module=notebook `
-          --exclude-module=ipython `
-          --exclude-module=pytest `
-          --exclude-module=unittest `
-          --collect-all ultralytics `
-          --noconfirm `
-          main.py
+        pyinstaller build.spec --noconfirm
       shell: pwsh
     
     # 6. Verificar que el .exe se creó correctamente

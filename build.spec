@@ -38,14 +38,14 @@ hiddenimports = [
 # Módulos a excluir (reducir tamaño del ejecutable)
 excludes = [
     'pytest',
-    'unittest',
+    # 'unittest',  # NO EXCLUIR - scipy/numpy lo necesitan
     '_pytest',
     'jupyter',
     'notebook',
     'ipython',
     'IPython',
     'torch.distributions',
-    'torch.testing',
+    # 'torch.testing',  # NO EXCLUIR - puede ser necesario para unittest
     'torchvision.models.detection',
     'torchvision.models.quantization',
     'torchvision.models.segmentation',
