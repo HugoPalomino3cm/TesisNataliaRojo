@@ -79,6 +79,6 @@ SAMPLES_INFO = {
 }
 
 # Crear directorios si no existen
-for directory in [DATA_DIR, RAW_IMAGES_DIR, PROCESSED_IMAGES_DIR, 
+for directory in [DATA_DIR, RAW_IMAGES_DIR, ANALYSIS_IMAGES_DIR, PROCESSED_IMAGES_DIR, 
                   RESULTS_DIR, GRAPHS_DIR, REPORTS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
