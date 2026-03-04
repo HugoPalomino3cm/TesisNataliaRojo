@@ -77,6 +77,36 @@ Este script:
 
 **¡Listo! El instalador hace todo por ti.**
 
+## 📦 Compilar a Ejecutable (.exe)
+
+### 🤖 Compilación Automática con GitHub Actions
+
+Este proyecto incluye **compilación automática en la nube** usando GitHub Actions:
+
+- ✅ **Sin PyInstaller local**: GitHub compila por ti en sus servidores
+- ✅ **Gratis**: 2000 minutos/mes de compilación gratuita
+- ✅ **Automático**: Cada vez que subes cambios, se genera un nuevo `.exe`
+- ✅ **Distribución fácil**: Cualquiera puede descargar el `.exe` sin instalar Python
+
+#### 📥 Descargar el .exe compilado
+
+1. Ve a tu repositorio en GitHub
+2. Click en **"Actions"** → Workflow más reciente
+3. Descarga desde **"Artifacts"** → **"AnalisisMicroplasticos-Windows.zip"**
+4. También puedes crear un **Release** y el `.exe` se adjunta automáticamente
+
+#### 🔧 Compilar localmente (opcional)
+
+Si prefieres compilar en tu PC:
+
+```cmd
+compilar_exe.bat
+```
+
+El `.exe` estará en `dist/AnalisisMicroplasticos.exe`
+
+**📖 Guía completa:** Ver [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)
+
 ## ▶️ Uso del Sistema
 
 ### 1️⃣ Preparar Imágenes

@@ -1,0 +1,79 @@
+name: Build Windows Executable
+
+# Se ejecuta cuando haces push o creas un release
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ created ]
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  build:
+    runs-on: windows-latest  # Servidor Windows en la nube de GitHub
+    
+    steps:
+    # 1. Descargar el código del repositorio
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    # 2. Configurar Python
+    - name: Configurar Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'  # Cachea las dependencias para compilar más rápido
+    
+    # 3. Instalar dependencias
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    # 4. Compilar el .exe con PyInstaller
+    - name: Compilar aplicación
+      run: |
+        pyinstaller --onefile --windowed --name="AnalisisMicroplasticos" `
+          --add-data "config;config" `
+          --add-data "src;src" `
+          --add-data "yolov8n.pt;." `
+          --hidden-import=PIL._tkinter_finder `
+          --hidden-import=sklearn.utils._weight_vector `
+          --icon=icon.ico `
+          main.py
+      continue-on-error: true
+    
+    # 5. Si falla, intentar sin ícono
+    - name: Compilar sin ícono (fallback)
+      if: failure()
+      run: |
+        pyinstaller --onefile --windowed --name="AnalisisMicroplasticos" `
+          --add-data "config;config" `
+          --add-data "src;src" `
+          --add-data "yolov8n.pt;." `
+          --hidden-import=PIL._tkinter_finder `
+          --hidden-import=sklearn.utils._weight_vector `
+          main.py
+    
+    # 6. Subir el .exe generado
+    - name: Subir ejecutable
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnalisisMicroplasticos-Windows
+        path: dist/AnalisisMicroplasticos.exe
+        retention-days: 90  # Guarda el archivo 90 días
+    
+    # 7. Si es un release, adjuntar el .exe automáticamente
+    - name: Adjuntar a Release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: dist/AnalisisMicroplasticos.exe
+        asset_name: AnalisisMicroplasticos.exe
+        asset_content_type: application/octet-stream
