@@ -29,9 +29,27 @@ hiddenimports = [
     'matplotlib',
     'seaborn',
     'scipy',
+    'openpyxl',
     'ultralytics',
     'torch',
     'torchvision',
+]
+
+# Módulos a excluir (reducir tamaño del ejecutable)
+excludes = [
+    'pytest',
+    'unittest',
+    '_pytest',
+    'jupyter',
+    'notebook',
+    'ipython',
+    'IPython',
+    'torch.distributions',
+    'torch.testing',
+    'torchvision.models.detection',
+    'torchvision.models.quantization',
+    'torchvision.models.segmentation',
+    'torchvision.models.video',
 ]
 
 # Binarios adicionales (si los necesitas)
@@ -43,14 +61,10 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=['pyinstaller_hooks'],  # Hooks personalizados
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'pytest',
-        'unittest',
-        '_pytest',
-    ],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

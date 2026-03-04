@@ -33,7 +33,14 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
-    # 4. Compilar el .exe con PyInstaller
+    # 4. Limpiar build anterior (si existe)
+    - name: Limpiar build anterior
+      run: |
+        if (Test-Path build) { Remove-Item -Recurse -Force build }
+        if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+      shell: pwsh
+    
+    # 5. Compilar el .exe con PyInstaller (optimizado)
     - name: Compilar aplicación
       run: |
         pyinstaller --onefile --windowed --name="AnalisisMicroplasticos" `
@@ -42,23 +49,40 @@ jobs:
           --add-data "yolov8n.pt;." `
           --hidden-import=PIL._tkinter_finder `
           --hidden-import=sklearn.utils._weight_vector `
-          --icon=icon.ico `
+          --hidden-import=cv2 `
+          --hidden-import=numpy `
+          --hidden-import=pandas `
+          --hidden-import=matplotlib `
+          --hidden-import=seaborn `
+          --hidden-import=scipy `
+          --hidden-import=openpyxl `
+          --exclude-module=torch.distributions `
+          --exclude-module=torch.testing `
+          --exclude-module=torchvision.models `
+          --exclude-module=jupyter `
+          --exclude-module=notebook `
+          --exclude-module=ipython `
+          --exclude-module=pytest `
+          --exclude-module=unittest `
+          --collect-all ultralytics `
+          --noconfirm `
           main.py
-      continue-on-error: true
+      shell: pwsh
     
-    # 5. Si falla, intentar sin ícono
-    - name: Compilar sin ícono (fallback)
-      if: failure()
+    # 6. Verificar que el .exe se creó correctamente
+    - name: Verificar ejecutable
       run: |
-        pyinstaller --onefile --windowed --name="AnalisisMicroplasticos" `
-          --add-data "config;config" `
-          --add-data "src;src" `
-          --add-data "yolov8n.pt;." `
-          --hidden-import=PIL._tkinter_finder `
-          --hidden-import=sklearn.utils._weight_vector `
-          main.py
+        if (Test-Path dist/AnalisisMicroplasticos.exe) {
+          Write-Host "✅ Ejecutable creado exitosamente"
+          $size = (Get-Item dist/AnalisisMicroplasticos.exe).Length / 1MB
+          Write-Host "📦 Tamaño: $([math]::Round($size, 2)) MB"
+        } else {
+          Write-Error "❌ Error: No se generó el ejecutable"
+          exit 1
+        }
+      shell: pwsh
     
-    # 6. Subir el .exe generado
+    # 7. Subir el .exe generado
     - name: Subir ejecutable
       uses: actions/upload-artifact@v4
       with:
@@ -66,7 +90,7 @@ jobs:
         path: dist/AnalisisMicroplasticos.exe
         retention-days: 90  # Guarda el archivo 90 días
     
-    # 7. Si es un release, adjuntar el .exe automáticamente
+    # 8. Si es un release, adjuntar el .exe automáticamente
     - name: Adjuntar a Release
       if: github.event_name == 'release'
       uses: actions/upload-release-asset@v1
